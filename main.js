@@ -33,17 +33,17 @@ const roomIdFromUrl = urlParams.get('room');
 
 if (roomIdFromUrl) {
     document.getElementById('host-section').style.display = 'none';
-} else {
-    // ホスト用要素を取得
-    hostJoinBtn = document.getElementById('host-join');
-    hostNameInput = document.getElementById('host-name');
-    buyinInput = document.getElementById('buyin-input');
-    sbInput = document.getElementById('sb-input');
-    bbInput = document.getElementById('bb-input');
-    roomInfo = document.getElementById('room-info');
-    roomUrl = document.getElementById('room-url');
-    copyUrlBtn = document.getElementById('copy-url');
 }
+
+// ホスト用要素を取得（存在する場合のみ）
+hostJoinBtn = document.getElementById('host-join');
+hostNameInput = document.getElementById('host-name');
+buyinInput = document.getElementById('buyin-input');
+sbInput = document.getElementById('sb-input');
+bbInput = document.getElementById('bb-input');
+roomInfo = document.getElementById('room-info');
+roomUrl = document.getElementById('room-url');
+copyUrlBtn = document.getElementById('copy-url');
 
 if (createBtn) {
     createBtn.addEventListener('click', async () => {
@@ -237,8 +237,10 @@ function handlePlayerAction(data) {
         game.bet(playerIndex, data.amount);
     }
     
-    rtc.broadcast({ type: 'game_update', state: game.getState() });
-    renderGame(game.getState());
+    const newState = game.getState();
+    rtc.broadcast({ type: 'game_update', state: newState });
+    renderGame(newState);
+    status.textContent = `${newState.phase} - ポット: ${newState.pot}`;
 }
 
 function renderGame(state) {
@@ -309,6 +311,12 @@ function renderGame(state) {
 }
 
 window.sendAction = function(action, amount) {
-    rtc.send({ type: 'action', playerId: myPlayerId, action, amount });
+    if (isHost) {
+        // ホストは直接処理
+        handlePlayerAction({ playerId: myPlayerId, action, amount });
+    } else {
+        // プレイヤーはホストに送信
+        rtc.send({ type: 'action', playerId: myPlayerId, action, amount });
+    }
 };
 
