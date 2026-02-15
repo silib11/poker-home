@@ -233,6 +233,14 @@ export class PokerGame {
         } else if (this.phase === 'RIVER') {
             this.phase = 'SHOWDOWN';
             this.determineWinner();
+            return;
+        }
+        
+        // 全員オールインなら次のフェーズへ自動進行
+        const activePlayers = this.players.filter(p => !p.folded);
+        const playersCanAct = activePlayers.filter(p => p.chips > 0);
+        if (playersCanAct.length <= 1 && this.phase !== 'SHOWDOWN') {
+            this.nextPhase();
         }
     }
 
