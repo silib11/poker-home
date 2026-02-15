@@ -206,12 +206,23 @@ function handlePlayerAction(data) {
 function renderGame(state) {
     const gameArea = document.getElementById('game-area');
     
+    const getCardColor = (suit) => {
+        if (suit === '♥') return '#ff0000';
+        if (suit === '♦') return '#0066ff';
+        if (suit === '♣') return '#00aa00';
+        if (suit === '♠') return '#000000';
+    };
+    
+    const renderCard = (card) => {
+        return `<span style="display:inline-block; background:#fff; color:${getCardColor(card.suit)}; padding:8px 12px; margin:0 3px; border-radius:6px; font-size:28px; font-weight:bold; box-shadow:0 2px 4px rgba(0,0,0,0.3);">${card.suit}${card.rank}</span>`;
+    };
+    
     // コミュニティカード
     let html = '<div style="text-align:center; margin:20px 0;">';
     html += '<h3>コミュニティカード</h3>';
-    html += '<div style="font-size:32px;">';
+    html += '<div>';
     state.community.forEach(card => {
-        html += `<span style="margin:0 5px;">${card.suit}${card.rank}</span>`;
+        html += renderCard(card);
     });
     html += '</div>';
     html += `<div style="margin:10px 0;">ポット: ${state.pot}</div>`;
@@ -228,9 +239,9 @@ function renderGame(state) {
         
         // 手札表示（自分のみ）
         if (p.id === myPlayerId && p.hand && p.hand.length > 0) {
-            html += '<div style="font-size:24px; margin:5px 0;">';
+            html += '<div style="margin:10px 0;">';
             p.hand.forEach(card => {
-                html += `<span style="margin:0 5px;">${card.suit}${card.rank}</span>`;
+                html += renderCard(card);
             });
             html += '</div>';
             
