@@ -24,7 +24,7 @@ export class PokerGame {
     // 山札生成
     createDeck() {
         const suits = ['♠', '♥', '♦', '♣'];
-        const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+        const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
         this.deck = [];
         suits.forEach(suit => {
             ranks.forEach(rank => {
@@ -248,7 +248,7 @@ export class PokerGame {
     // 役名を取得
     getHandName(hand) {
         const allCards = [...hand, ...this.community];
-        const rankValues = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14 };
+        const rankValues = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, 'T': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14 };
         
         const cards = allCards.map(c => ({ rank: c.rank, suit: c.suit, value: rankValues[c.rank] }));
         cards.sort((a, b) => b.value - a.value);
@@ -297,7 +297,7 @@ export class PokerGame {
     // 役判定（正式版）
     evaluateHand(hand) {
         const allCards = [...hand, ...this.community];
-        const rankValues = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14 };
+        const rankValues = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, 'T': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14 };
         
         // カードをランクと数値に変換
         const cards = allCards.map(c => ({ rank: c.rank, suit: c.suit, value: rankValues[c.rank] }));
