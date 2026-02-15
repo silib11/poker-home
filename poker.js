@@ -142,6 +142,15 @@ export class PokerGame {
     nextTurn() {
         const activePlayers = this.players.filter(p => !p.folded);
         
+        // オールインしているプレイヤーを除外してアクション可能なプレイヤーを取得
+        const playersCanAct = activePlayers.filter(p => p.chips > 0);
+        
+        // アクション可能なプレイヤーが1人以下ならフェーズ進行
+        if (playersCanAct.length <= 1) {
+            this.nextPhase();
+            return;
+        }
+        
         // 全員アクション済みかつベット額が揃っているかチェック
         const allActed = activePlayers.every(p => p.acted);
         const allBetsEqual = activePlayers.every(p => p.bet === this.currentBet || p.chips === 0);
@@ -151,10 +160,10 @@ export class PokerGame {
             return;
         }
         
-        // 次のプレイヤー
+        // 次のプレイヤー（フォールドまたはオールインしていない人）
         do {
             this.turnIndex = (this.turnIndex + 1) % this.players.length;
-        } while (this.players[this.turnIndex].folded);
+        } while (this.players[this.turnIndex].folded || this.players[this.turnIndex].chips === 0);
     }
 
     // 次のフェーズ

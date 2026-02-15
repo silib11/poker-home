@@ -448,26 +448,35 @@ function renderGame(state) {
                     html += `<button onclick="sendAction('call')" style="width:48%; margin:2px;">コール(${callAmount})</button>`;
                 }
                 
-                // ベット/レイズ - シンプルなプリセットボタン
+                // ベット/レイズ - プリセットボタン + スライダー
                 const minTotalBet = state.currentBet === 0 ? state.bb : state.currentBet * 2;
                 const maxTotalBet = p.bet + p.chips;
                 
                 if (minTotalBet <= maxTotalBet) {
                     const label = state.currentBet === 0 ? 'ベット' : 'レイズ';
                     
-                    // ミニマムレイズ
-                    html += `<button onclick="sendAction('bet', ${minTotalBet})" style="width:48%; margin:2px;">${label} ${minTotalBet}</button>`;
+                    // スライダー
+                    html += `<div style="margin:10px 0;">`;
+                    html += `<input type="range" id="raise-slider-${i}" min="${minTotalBet}" max="${maxTotalBet}" value="${minTotalBet}" step="${state.bb}" style="width:100%;" oninput="updateRaiseDisplay(${i})">`;
+                    html += `<div style="text-align:center; font-size:18px; font-weight:bold; margin:5px 0;">`;
+                    html += `<span id="raise-display-${i}">${minTotalBet}</span> チップ`;
+                    html += `</div>`;
+                    html += `<button onclick="sendSliderRaise(${i})" style="width:100%; margin:2px; background:#ff9966; font-size:16px; padding:12px;">${label}</button>`;
+                    html += `</div>`;
                     
-                    // ポットレイズ（ポット額 + コール額）
+                    // プリセットボタン
+                    html += `<div style="display:flex; gap:5px; margin:5px 0;">`;
+                    html += `<button onclick="setRaiseAmount(${i}, ${minTotalBet})" style="flex:1; padding:8px; font-size:12px;">ミニマム</button>`;
+                    
                     const potRaise = state.pot + state.currentBet;
                     if (potRaise > minTotalBet && potRaise <= maxTotalBet) {
-                        html += `<button onclick="sendAction('bet', ${potRaise})" style="width:48%; margin:2px;">ポット ${potRaise}</button>`;
+                        html += `<button onclick="setRaiseAmount(${i}, ${potRaise})" style="flex:1; padding:8px; font-size:12px;">ポット</button>`;
                     }
                     
-                    // オールイン
                     if (maxTotalBet > minTotalBet) {
-                        html += `<button onclick="sendAction('bet', ${maxTotalBet})" style="width:48%; margin:2px; background:#cc0000;">オールイン ${maxTotalBet}</button>`;
+                        html += `<button onclick="setRaiseAmount(${i}, ${maxTotalBet})" style="flex:1; padding:8px; font-size:12px; background:#cc0000;">オールイン</button>`;
                     }
+                    html += `</div>`;
                 }
                 
                 html += '</div>';
@@ -492,6 +501,31 @@ window.sendAction = function(action, amount) {
         // クライアントはホストに送信
         rtc.send({ type: 'action', playerId: myPlayerId, action, amount: amountNum });
     }
+};
+
+window.updateRaiseDisplay = function(playerIndex) {
+    const slider = document.getElementById(`raise-slider-${playerIndex}`);
+    const display = document.getElementById(`raise-display-${playerIndex}`);
+    if (slider && display) {
+        display.textContent = slider.value;
+    }
+};
+
+window.setRaiseAmount = function(playerIndex, amount) {
+    const slider = document.getElementById(`raise-slider-${playerIndex}`);
+    const display = document.getElementById(`raise-display-${playerIndex}`);
+    if (slider && display) {
+        slider.value = amount;
+        display.textContent = amount;
+    }
+};
+
+window.sendSliderRaise = function(playerIndex) {
+    const slider = document.getElementById(`raise-slider-${playerIndex}`);
+    if (!slider) return;
+    
+    const amount = parseInt(slider.value);
+    sendAction('bet', amount);
 };
 
 window.readyNextHand = function() {
