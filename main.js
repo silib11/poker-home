@@ -6,20 +6,15 @@ const gameScreen = document.getElementById('game-screen');
 const status = document.getElementById('status');
 const createBtn = document.getElementById('create-room');
 const joinBtn = document.getElementById('join-room');
-const hostJoinBtn = document.getElementById('host-join');
 const playerNameInput = document.getElementById('player-name');
-const hostNameInput = document.getElementById('host-name');
-const buyinInput = document.getElementById('buyin-input');
-const sbInput = document.getElementById('sb-input');
-const bbInput = document.getElementById('bb-input');
-const roomInfo = document.getElementById('room-info');
-const roomUrl = document.getElementById('room-url');
 const hostControls = document.getElementById('host-controls');
 const sbControl = document.getElementById('sb-control');
 const bbControl = document.getElementById('bb-control');
 const updateBlindsBtn = document.getElementById('update-blinds');
 const startGameBtn = document.getElementById('start-game');
 const playersList = document.getElementById('players-list');
+
+let hostJoinBtn, hostNameInput, buyinInput, sbInput, bbInput, roomInfo, roomUrl;
 
 let rtc;
 let isHost = false;
@@ -38,9 +33,19 @@ const roomIdFromUrl = urlParams.get('room');
 
 if (roomIdFromUrl) {
     document.getElementById('host-section').style.display = 'none';
+} else {
+    // ホスト用要素を取得
+    hostJoinBtn = document.getElementById('host-join');
+    hostNameInput = document.getElementById('host-name');
+    buyinInput = document.getElementById('buyin-input');
+    sbInput = document.getElementById('sb-input');
+    bbInput = document.getElementById('bb-input');
+    roomInfo = document.getElementById('room-info');
+    roomUrl = document.getElementById('room-url');
 }
 
-createBtn.addEventListener('click', async () => {
+if (createBtn) {
+    createBtn.addEventListener('click', async () => {
     isHost = true;
     const buyin = parseInt(buyinInput.value);
     const sb = parseInt(sbInput.value);
@@ -66,8 +71,10 @@ createBtn.addEventListener('click', async () => {
     
     status.textContent = 'ルーム作成完了';
 });
+}
 
-hostJoinBtn.addEventListener('click', () => {
+if (hostJoinBtn) {
+    hostJoinBtn.addEventListener('click', () => {
     const name = hostNameInput.value.trim();
     if (!name) {
         alert('名前を入力してください');
@@ -93,6 +100,7 @@ hostJoinBtn.addEventListener('click', () => {
     
     status.textContent = `参加完了: ${gameState.players.length}人`;
 });
+}
 
 joinBtn.addEventListener('click', async () => {
     const name = playerNameInput.value.trim();
