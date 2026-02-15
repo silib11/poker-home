@@ -27,6 +27,7 @@ let myPlayerId = null;
 let myPlayerName = null;
 let currentRoomId = null;
 let nextHandReady = new Set();
+let allPlayers = []; // 全プレイヤーを保持（ゲーム再開用）
 let gameState = {
     players: [],
     buyin: 1000,
@@ -66,11 +67,13 @@ createBtn.addEventListener('click', async () => {
         
         // ホスト自身をプレイヤーとして追加
         myPlayerId = Date.now().toString();
-        gameState.players.push({
+        const hostPlayer = {
             id: myPlayerId,
             name: hostName,
             chips: gameState.buyin
-        });
+        };
+        gameState.players.push(hostPlayer);
+        allPlayers.push(hostPlayer); // 全プレイヤーリストにも追加
         
         setupScreen.style.display = 'none';
         gameScreen.style.display = 'block';
@@ -155,11 +158,13 @@ function handleMessage(msg) {
     
     if (data.type === 'join' && isHost) {
         const playerId = Date.now().toString();
-        gameState.players.push({
+        const newPlayer = {
             id: playerId,
             name: data.name,
             chips: gameState.buyin
-        });
+        };
+        gameState.players.push(newPlayer);
+        allPlayers.push(newPlayer); // 全プレイヤーリストにも追加
         updatePlayersList();
         rtc.broadcast({ type: 'state', state: gameState });
         rtc.broadcast({ type: 'player_id', playerId, name: data.name });
@@ -193,11 +198,15 @@ function handleMessage(msg) {
     }
     
     if (data.type === 'game_restart') {
-        // チップをリセット
-        gameState.players = gameState.players.map(p => ({
-            ...p,
-            chips: data.buyin
-        }));
+        // 全プレイヤーのチップをリセット（飛んだプレイヤーも復活）
+        if (data.allPlayers) {
+            gameState.players = data.allPlayers;
+        } else {
+            gameState.players = gameState.players.map(p => ({
+                ...p,
+                chips: data.buyin
+            }));
+        }
         updatePlayersList();
         renderGame(data.state);
         status.textContent = `ゲーム再開 - ${data.state.phase}`;
@@ -637,9 +646,10 @@ function showGameOver() {
 }
 
 window.restartGame = function() {
-    // 全プレイヤーのチップをリセット
-    gameState.players = gameState.players.map(p => ({
-        ...p,
+    // 全プレイヤーのチップをリセット（飛んだプレイヤーも復活）
+    gameState.players = allPlayers.map(p => ({
+        id: p.id,
+        name: p.name,
         chips: gameState.buyin
     }));
     
@@ -648,7 +658,7 @@ window.restartGame = function() {
     game.start();
     
     const state = game.getState();
-    rtc.broadcast({ type: 'game_restart', state, buyin: gameState.buyin });
+    rtc.broadcast({ type: 'game_restart', state, buyin: gameState.buyin, allPlayers: gameState.players });
     renderGame(state);
     updatePlayersList();
     status.textContent = `ゲーム再開 - ${game.phase}`;
