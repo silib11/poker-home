@@ -360,7 +360,8 @@ function renderGame(state) {
         if (totalPlayers === 2) return null;
         if (totalPlayers === 3) return null; // D, SB, BBのみ
         
-        // ポジションの順序：D(0) → SB(1) → BB(2) → UTG(3) → HJ(4) → LJ(5) → CO(6) → D
+        // ポジションの順序：D(0) → SB(1) → BB(2) → UTG(3) → LJ(4) → HJ(5) → CO(6) → D
+        // 優先順位：UTG > CO > HJ > LJ
         const positionsAfterBB = [];
         for (let i = 3; i < totalPlayers; i++) {
             const pos = (dealerIndex + i) % totalPlayers;
@@ -368,8 +369,8 @@ function renderGame(state) {
         }
         
         if (totalPlayers === 4) {
-            // D, SB, BB, CO
-            if (index === positionsAfterBB[positionsAfterBB.length - 1]) return 'CO';
+            // D, SB, BB, UTG
+            if (index === positionsAfterBB[0]) return 'UTG';
         } else if (totalPlayers === 5) {
             // D, SB, BB, UTG, CO
             if (index === positionsAfterBB[0]) return 'UTG';
@@ -380,10 +381,10 @@ function renderGame(state) {
             if (index === positionsAfterBB[1]) return 'HJ';
             if (index === positionsAfterBB[positionsAfterBB.length - 1]) return 'CO';
         } else if (totalPlayers >= 7) {
-            // D, SB, BB, UTG, HJ, LJ, CO
+            // D, SB, BB, UTG, LJ, HJ, CO
             if (index === positionsAfterBB[0]) return 'UTG';
-            if (index === positionsAfterBB[1]) return 'HJ';
-            if (index === positionsAfterBB[2]) return 'LJ';
+            if (index === positionsAfterBB[1]) return 'LJ';
+            if (index === positionsAfterBB[2]) return 'HJ';
             if (index === positionsAfterBB[positionsAfterBB.length - 1]) return 'CO';
         }
         

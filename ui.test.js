@@ -26,7 +26,8 @@ function getPositionName(index, dealerIndex, totalPlayers) {
     if (totalPlayers === 2) return null;
     if (totalPlayers === 3) return null;
     
-    // ポジションの順序：D(0) → SB(1) → BB(2) → UTG(3) → HJ(4) → LJ(5) → CO(6) → D
+    // ポジションの順序：D(0) → SB(1) → BB(2) → UTG(3) → LJ(4) → HJ(5) → CO(6) → D
+    // 優先順位：UTG > CO > HJ > LJ
     const positionsAfterBB = [];
     for (let i = 3; i < totalPlayers; i++) {
         const pos = (dealerIndex + i) % totalPlayers;
@@ -34,7 +35,7 @@ function getPositionName(index, dealerIndex, totalPlayers) {
     }
     
     if (totalPlayers === 4) {
-        if (index === positionsAfterBB[positionsAfterBB.length - 1]) return 'CO';
+        if (index === positionsAfterBB[0]) return 'UTG';
     } else if (totalPlayers === 5) {
         if (index === positionsAfterBB[0]) return 'UTG';
         if (index === positionsAfterBB[positionsAfterBB.length - 1]) return 'CO';
@@ -44,8 +45,8 @@ function getPositionName(index, dealerIndex, totalPlayers) {
         if (index === positionsAfterBB[positionsAfterBB.length - 1]) return 'CO';
     } else if (totalPlayers >= 7) {
         if (index === positionsAfterBB[0]) return 'UTG';
-        if (index === positionsAfterBB[1]) return 'HJ';
-        if (index === positionsAfterBB[2]) return 'LJ';
+        if (index === positionsAfterBB[1]) return 'LJ';
+        if (index === positionsAfterBB[2]) return 'HJ';
         if (index === positionsAfterBB[positionsAfterBB.length - 1]) return 'CO';
     }
     
@@ -73,18 +74,18 @@ test('ポジション表示：3人', () => {
     assertEquals(getPositionName(2, dealerIndex, totalPlayers), null, 'BB');
 });
 
-test('ポジション表示：4人（D, SB, BB, CO）', () => {
+test('ポジション表示：4人（D, SB, BB, UTG）', () => {
     const dealerIndex = 0;
     const totalPlayers = 4;
     
-    // D=0, SB=1, BB=2, CO=3
+    // D=0, SB=1, BB=2, UTG=3
     assertEquals(getPositionName(0, dealerIndex, totalPlayers), null, 'D');
     assertEquals(getPositionName(1, dealerIndex, totalPlayers), null, 'SB');
     assertEquals(getPositionName(2, dealerIndex, totalPlayers), null, 'BB');
-    assertEquals(getPositionName(3, dealerIndex, totalPlayers), 'CO', 'CO');
+    assertEquals(getPositionName(3, dealerIndex, totalPlayers), 'UTG', 'UTG');
 });
 
-test('ポジション表示：5人（D, SB, BB, CO, UTG）', () => {
+test('ポジション表示：5人（D, SB, BB, UTG, CO）', () => {
     const dealerIndex = 0;
     const totalPlayers = 5;
     
@@ -109,17 +110,17 @@ test('ポジション表示：6人（D, SB, BB, UTG, HJ, CO）', () => {
     assertEquals(getPositionName(5, dealerIndex, totalPlayers), 'CO', 'CO');
 });
 
-test('ポジション表示：7人（D, SB, BB, UTG, HJ, LJ, CO）', () => {
+test('ポジション表示：7人（D, SB, BB, UTG, LJ, HJ, CO）', () => {
     const dealerIndex = 0;
     const totalPlayers = 7;
     
-    // D=0, SB=1, BB=2, UTG=3, HJ=4, LJ=5, CO=6
+    // D=0, SB=1, BB=2, UTG=3, LJ=4, HJ=5, CO=6
     assertEquals(getPositionName(0, dealerIndex, totalPlayers), null, 'D');
     assertEquals(getPositionName(1, dealerIndex, totalPlayers), null, 'SB');
     assertEquals(getPositionName(2, dealerIndex, totalPlayers), null, 'BB');
     assertEquals(getPositionName(3, dealerIndex, totalPlayers), 'UTG', 'UTG');
-    assertEquals(getPositionName(4, dealerIndex, totalPlayers), 'HJ', 'HJ');
-    assertEquals(getPositionName(5, dealerIndex, totalPlayers), 'LJ', 'LJ');
+    assertEquals(getPositionName(4, dealerIndex, totalPlayers), 'LJ', 'LJ');
+    assertEquals(getPositionName(5, dealerIndex, totalPlayers), 'HJ', 'HJ');
     assertEquals(getPositionName(6, dealerIndex, totalPlayers), 'CO', 'CO');
 });
 
