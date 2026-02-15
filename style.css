@@ -1,0 +1,76 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #1a1a1a;
+    color: #fff;
+    padding: 20px;
+}
+
+#app {
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+h1 {
+    font-size: 24px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+#status {
+    background: #333;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+button {
+    width: 100%;
+    padding: 15px;
+    margin: 10px 0;
+    background: #007aff;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+}
+
+input {
+    width: 100%;
+    padding: 15px;
+    margin: 10px 0;
+    background: #333;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 8px;
+    font-size: 16px;
+}
+
+#room-id-display {
+    background: #2a2a2a;
+    padding: 15px;
+    border-radius: 8px;
+    margin: 10px 0;
+    word-break: break-all;
+}
+
+#messages {
+    margin-top: 20px;
+    background: #2a2a2a;
+    padding: 15px;
+    border-radius: 8px;
+    min-height: 200px;
+}
+
+.message {
+    padding: 8px;
+    margin: 5px 0;
+    background: #333;
+    border-radius: 4px;
+}
