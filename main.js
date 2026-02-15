@@ -60,12 +60,16 @@ createBtn.addEventListener('click', async () => {
     const roomId = await rtc.createRoom();
     const url = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
     
-    await QRCode.toCanvas(document.createElement('canvas'), url, { width: 200 }, (err, canvas) => {
-        if (!err) {
-            qrCode.innerHTML = '';
-            qrCode.appendChild(canvas);
-        }
-    });
+    // QRコード生成
+    const canvas = document.createElement('canvas');
+    try {
+        await QRCode.toCanvas(canvas, url, { width: 200 });
+        qrCode.innerHTML = '';
+        qrCode.appendChild(canvas);
+    } catch (err) {
+        console.error('QR生成エラー:', err);
+        qrCode.textContent = 'QR生成失敗';
+    }
     
     roomUrl.textContent = url;
     qrSection.style.display = 'block';
