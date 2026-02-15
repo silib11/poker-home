@@ -197,11 +197,22 @@ function handleMessage(msg) {
 }
 
 function updatePlayersList() {
+    // チップ数で降順ソート
+    const sortedPlayers = [...gameState.players].sort((a, b) => b.chips - a.chips);
+    
     playersList.innerHTML = `<h3>プレイヤー (${gameState.players.length}人)</h3>`;
-    gameState.players.forEach(p => {
+    sortedPlayers.forEach((p, index) => {
         const div = document.createElement('div');
         div.className = 'player-item';
-        div.innerHTML = `<span>${p.name}</span><span>${p.chips} chips</span>`;
+        
+        // 順位表示
+        let rankIcon = '';
+        if (index === 0) rankIcon = '🥇 ';
+        else if (index === 1) rankIcon = '🥈 ';
+        else if (index === 2) rankIcon = '🥉 ';
+        else rankIcon = `${index + 1}位 `;
+        
+        div.innerHTML = `<span>${rankIcon}${p.name}</span><span style="font-weight:bold;">${p.chips} chips</span>`;
         playersList.appendChild(div);
     });
 }
@@ -360,17 +371,17 @@ function renderGame(state) {
                 }
                 
                 // ベット/レイズ
-                // 最小レイズ額 = 現在のベット額の2倍（自分のベット額を含む）
-                const minRaise = state.currentBet === 0 ? state.bb : state.currentBet * 2 - p.bet;
-                const maxRaise = p.chips;
+                // 最小レイズ額（総ベット額） = 現在のベット額の2倍
+                const minTotalBet = state.currentBet === 0 ? state.bb : state.currentBet * 2;
+                const maxTotalBet = p.bet + p.chips;
                 
-                if (minRaise > 0 && minRaise <= maxRaise) {
+                if (minTotalBet <= maxTotalBet) {
                     const label = state.currentBet === 0 ? 'ベット' : 'レイズ';
-                    const displayAmount = state.currentBet === 0 ? minRaise : minRaise + p.bet;
-                    html += `<button onclick="showRaiseInput(${i}, ${minRaise}, ${maxRaise})" style="width:98%; margin:2px;">${label}(${displayAmount})</button>`;
+                    html += `<button onclick="showRaiseInput(${i}, ${minTotalBet}, ${maxTotalBet}, ${p.bet})" style="width:98%; margin:2px;">${label}(${minTotalBet})</button>`;
                     html += `<div id="raise-input-${i}" style="display:none; margin:5px 0;">`;
-                    html += `<input type="number" id="raise-amount-${i}" value="${minRaise}" min="${minRaise}" max="${maxRaise}" step="${state.bb}" style="width:60%;">`;
-                    html += `<button onclick="sendRaise(${i}, ${p.bet})" style="width:35%; margin-left:5px;">確定</button>`;
+                    html += `<label style="font-size:12px; color:#aaa;">総ベット額:</label>`;
+                    html += `<input type="number" id="raise-amount-${i}" value="${minTotalBet}" min="${minTotalBet}" max="${maxTotalBet}" step="${state.bb}" style="width:60%;">`;
+                    html += `<button onclick="sendRaise(${i})" style="width:35%; margin-left:5px;">確定</button>`;
                     html += `</div>`;
                 }
                 
@@ -402,7 +413,7 @@ window.sendAction = function(action, amount) {
     }
 };
 
-window.showRaiseInput = function(playerIndex, minAmount, maxAmount) {
+window.showRaiseInput = function(playerIndex, minAmount, maxAmount, currentBet) {
     // すべての入力欄を非表示
     document.querySelectorAll('[id^="raise-input-"]').forEach(el => el.style.display = 'none');
     // 該当の入力欄を表示
@@ -412,15 +423,13 @@ window.showRaiseInput = function(playerIndex, minAmount, maxAmount) {
     }
 };
 
-window.sendRaise = function(playerIndex, currentBet) {
+window.sendRaise = function(playerIndex) {
     const input = document.getElementById(`raise-amount-${playerIndex}`);
     if (!input) return;
     
-    const raiseAmount = parseInt(input.value);
-    // 総ベット額 = 現在のベット + レイズ額
-    const totalBet = currentBet + raiseAmount;
+    const totalBet = parseInt(input.value);
     
-    console.log('sendRaise: raiseAmount=', raiseAmount, 'currentBet=', currentBet, 'totalBet=', totalBet);
+    console.log('sendRaise: totalBet=', totalBet);
     
     if (isHost) {
         handlePlayerAction({ playerId: myPlayerId, action: 'bet', amount: totalBet });

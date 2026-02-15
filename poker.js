@@ -117,8 +117,10 @@ export class PokerGame {
         const activePlayers = this.players.filter(p => !p.folded);
         if (activePlayers.length === 1) {
             this.phase = 'WINNER';
-            activePlayers[0].chips += this.pot;
+            const winAmount = this.pot;
+            activePlayers[0].chips += winAmount;
             this.winner = activePlayers[0];
+            this.winAmount = winAmount;
             return;
         }
         
