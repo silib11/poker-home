@@ -5,7 +5,8 @@ export class PokerGame {
             hand: [],
             bet: 0,
             folded: false,
-            position: i
+            position: i,
+            acted: false
         }));
         this.sb = sb;
         this.bb = bb;
@@ -16,6 +17,7 @@ export class PokerGame {
         this.phase = 'PREFLOP';
         this.turnIndex = 0;
         this.dealerIndex = 0;
+        this.lastRaiserIndex = -1;
     }
 
     // 山札生成
@@ -49,13 +51,16 @@ export class PokerGame {
         
         this.players[sbIndex].chips -= this.sb;
         this.players[sbIndex].bet = this.sb;
+        this.players[sbIndex].acted = true;
         this.pot += this.sb;
         
         this.players[bbIndex].chips -= this.bb;
         this.players[bbIndex].bet = this.bb;
+        this.players[bbIndex].acted = true;
         this.pot += this.bb;
         
         this.currentBet = this.bb;
+        this.lastRaiserIndex = bbIndex;
         this.turnIndex = (bbIndex + 1) % this.players.length;
         
         // 手札配布
@@ -69,15 +74,22 @@ export class PokerGame {
     // ベット処理
     bet(playerIndex, amount) {
         const player = this.players[playerIndex];
-        const toCall = this.currentBet - player.bet;
         const totalBet = Math.min(amount, player.chips);
         
         player.chips -= totalBet;
         player.bet += totalBet;
+        player.acted = true;
         this.pot += totalBet;
         
         if (player.bet > this.currentBet) {
             this.currentBet = player.bet;
+            this.lastRaiserIndex = playerIndex;
+            // レイズされたら他のプレイヤーのactedをリセット
+            this.players.forEach((p, i) => {
+                if (i !== playerIndex && !p.folded) {
+                    p.acted = false;
+                }
+            });
         }
         
         this.nextTurn();
@@ -90,6 +102,7 @@ export class PokerGame {
         
         player.chips -= toCall;
         player.bet += toCall;
+        player.acted = true;
         this.pot += toCall;
         
         this.nextTurn();
@@ -98,11 +111,22 @@ export class PokerGame {
     // フォールド
     fold(playerIndex) {
         this.players[playerIndex].folded = true;
+        this.players[playerIndex].acted = true;
+        
+        // 1人だけ残ったら即終了
+        const activePlayers = this.players.filter(p => !p.folded);
+        if (activePlayers.length === 1) {
+            this.phase = 'SHOWDOWN';
+            this.determineWinner();
+            return;
+        }
+        
         this.nextTurn();
     }
 
     // チェック
     check(playerIndex) {
+        this.players[playerIndex].acted = true;
         this.nextTurn();
     }
 
@@ -110,10 +134,11 @@ export class PokerGame {
     nextTurn() {
         const activePlayers = this.players.filter(p => !p.folded);
         
-        // 全員ベット揃ったかチェック
+        // 全員アクション済みかつベット額が揃っているかチェック
+        const allActed = activePlayers.every(p => p.acted);
         const allBetsEqual = activePlayers.every(p => p.bet === this.currentBet || p.chips === 0);
         
-        if (allBetsEqual) {
+        if (allActed && allBetsEqual) {
             this.nextPhase();
             return;
         }
@@ -127,9 +152,18 @@ export class PokerGame {
     // 次のフェーズ
     nextPhase() {
         // ベットリセット
-        this.players.forEach(p => p.bet = 0);
+        this.players.forEach(p => {
+            p.bet = 0;
+            p.acted = false;
+        });
         this.currentBet = 0;
+        this.lastRaiserIndex = -1;
+        
+        // 最初のアクティブプレイヤーから開始
         this.turnIndex = (this.dealerIndex + 1) % this.players.length;
+        while (this.players[this.turnIndex].folded) {
+            this.turnIndex = (this.turnIndex + 1) % this.players.length;
+        }
         
         if (this.phase === 'PREFLOP') {
             this.community = [this.deck.pop(), this.deck.pop(), this.deck.pop()];
