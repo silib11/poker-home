@@ -2,10 +2,13 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getDatabase, ref, set, onValue, remove } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js';
 
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT.firebaseapp.com",
-    databaseURL: "https://YOUR_PROJECT.firebaseio.com",
-    projectId: "YOUR_PROJECT"
+    apiKey: "AIzaSyCc_I2QJWLdeVsaTW_g9Cs3SNK6KRnULeA",
+    authDomain: "poker-home-62fab.firebaseapp.com",
+    databaseURL: "https://poker-home-62fab-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "poker-home-62fab",
+    storageBucket: "poker-home-62fab.firebasestorage.app",
+    messagingSenderId: "619012333652",
+    appId: "1:619012333652:web:2fa9678ba423d7f6b10dc1"
 };
 
 const app = initializeApp(firebaseConfig);
