@@ -54,10 +54,20 @@ createBtn.addEventListener('click', async () => {
     try {
         currentRoomId = await rtc.createRoom();
         console.log('ルームID:', currentRoomId);
-        roomIdDisplay.textContent = `ルームID: ${currentRoomId}`;
-        roomIdDisplay.style.fontSize = '20px';
-        roomIdDisplay.style.fontWeight = 'bold';
-        roomInfo.style.display = 'block';
+        
+        if (roomIdDisplay) {
+            roomIdDisplay.textContent = `ルームID: ${currentRoomId}`;
+            roomIdDisplay.style.fontSize = '20px';
+            roomIdDisplay.style.fontWeight = 'bold';
+        } else {
+            console.error('roomIdDisplay要素が見つかりません');
+            alert(`ルームID: ${currentRoomId}`);
+        }
+        
+        if (roomInfo) {
+            roomInfo.style.display = 'block';
+        }
+        
         status.textContent = 'ルーム作成完了 - プレイヤー待機中';
     } catch (err) {
         console.error('ルーム作成エラー:', err);
