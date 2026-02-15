@@ -41,13 +41,18 @@
             <div id="status">待機中...</div>
             
             <div id="host-controls" style="display:none;">
-                <h3>ホストコントロール</h3>
-                <div>
-                    <label>SB: <input type="number" id="sb-control" min="5" step="5"></label>
-                    <label>BB: <input type="number" id="bb-control" min="10" step="10"></label>
-                    <button id="update-blinds">更新</button>
+                <button id="toggle-host-menu" style="width:100%; background:#555; margin:5px 0;">⚙️ ホストメニュー</button>
+                <div id="host-menu" style="display:none; background:#2a2a2a; padding:10px; border-radius:8px; margin:10px 0;">
+                    <h3 style="margin:10px 0;">ゲームコントロール</h3>
+                    <button id="start-game">ゲーム開始</button>
+                    
+                    <button id="toggle-blinds" style="background:#666; margin-top:10px;">ブラインド変更</button>
+                    <div id="blinds-control" style="display:none; margin:10px 0; padding:10px; background:#1a1a1a; border-radius:8px;">
+                        <label>SB: <input type="number" id="sb-control" min="5" step="5" style="width:80px;"></label>
+                        <label>BB: <input type="number" id="bb-control" min="10" step="10" style="width:80px;"></label>
+                        <button id="update-blinds">更新</button>
+                    </div>
                 </div>
-                <button id="start-game">ゲーム開始</button>
             </div>
             
             <div id="players-list"></div>

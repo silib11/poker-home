@@ -131,6 +131,39 @@ updateBlindsBtn.addEventListener('click', () => {
     status.textContent = `ブラインド更新: ${gameState.sb}/${gameState.bb}`;
 });
 
+// ホストメニュートグル
+const toggleHostMenuBtn = document.getElementById('toggle-host-menu');
+const hostMenu = document.getElementById('host-menu');
+const toggleBlindsBtn = document.getElementById('toggle-blinds');
+const blindsControl = document.getElementById('blinds-control');
+
+if (toggleHostMenuBtn) {
+    toggleHostMenuBtn.addEventListener('click', () => {
+        if (hostMenu.style.display === 'none') {
+            hostMenu.style.display = 'block';
+            toggleHostMenuBtn.textContent = '⚙️ メニューを閉じる';
+        } else {
+            hostMenu.style.display = 'none';
+            toggleHostMenuBtn.textContent = '⚙️ ホストメニュー';
+            // メニューを閉じたらブラインドコントロールも閉じる
+            blindsControl.style.display = 'none';
+            toggleBlindsBtn.textContent = 'ブラインド変更';
+        }
+    });
+}
+
+if (toggleBlindsBtn) {
+    toggleBlindsBtn.addEventListener('click', () => {
+        if (blindsControl.style.display === 'none') {
+            blindsControl.style.display = 'block';
+            toggleBlindsBtn.textContent = '閉じる';
+        } else {
+            blindsControl.style.display = 'none';
+            toggleBlindsBtn.textContent = 'ブラインド変更';
+        }
+    });
+}
+
 startGameBtn.addEventListener('click', () => {
     if (gameState.players.length < 2) {
         alert('最低2人必要です');
