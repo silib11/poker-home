@@ -128,3 +128,8 @@ input {
 #game-area {
     margin: 20px 0;
 }
+
+#game-area button {
+    padding: 10px;
+    font-size: 14px;
+}

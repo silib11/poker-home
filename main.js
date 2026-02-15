@@ -1,4 +1,5 @@
 import { WebRTCManager } from './webrtc.js';
+import { PokerGame } from './poker.js';
 import QRCode from 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/+esm';
 
 const setupScreen = document.getElementById('setup-screen');
@@ -22,6 +23,8 @@ const playersList = document.getElementById('players-list');
 
 let rtc;
 let isHost = false;
+let game = null;
+let myPlayerId = null;
 let gameState = {
     players: [],
     buyin: 1000,
@@ -114,21 +117,36 @@ updateBlindsBtn.addEventListener('click', () => {
 });
 
 startGameBtn.addEventListener('click', () => {
-    rtc.broadcast({ type: 'start' });
-    status.textContent = 'ゲーム開始！';
+    if (gameState.players.length < 2) {
+        alert('最低2人必要です');
+        return;
+    }
+    
+    game = new PokerGame(gameState.players, gameState.sb, gameState.bb);
+    game.start();
+    
+    rtc.broadcast({ type: 'game_start', state: game.getState() });
+    renderGame(game.getState());
+    status.textContent = `ゲーム開始 - ${game.phase}`;
 });
 
 function handleMessage(msg) {
     const data = JSON.parse(msg);
     
     if (data.type === 'join' && isHost) {
+        const playerId = Date.now().toString();
         gameState.players.push({
-            id: Date.now(),
+            id: playerId,
             name: data.name,
             chips: gameState.buyin
         });
         updatePlayersList();
         rtc.broadcast({ type: 'state', state: gameState });
+        rtc.broadcast({ type: 'player_id', playerId, to: data.name });
+    }
+    
+    if (data.type === 'player_id' && data.to === playerNameInput.value) {
+        myPlayerId = data.playerId;
     }
     
     if (data.type === 'state') {
@@ -142,8 +160,18 @@ function handleMessage(msg) {
         status.textContent = `ブラインド: ${data.sb}/${data.bb}`;
     }
     
-    if (data.type === 'start') {
-        status.textContent = 'ゲーム開始！';
+    if (data.type === 'game_start') {
+        renderGame(data.state);
+        status.textContent = `ゲーム開始 - ${data.state.phase}`;
+    }
+    
+    if (data.type === 'game_update') {
+        renderGame(data.state);
+        status.textContent = `${data.state.phase} - ポット: ${data.state.pot}`;
+    }
+    
+    if (data.type === 'action' && isHost) {
+        handlePlayerAction(data);
     }
 }
 
@@ -156,3 +184,82 @@ function updatePlayersList() {
         playersList.appendChild(div);
     });
 }
+
+function handlePlayerAction(data) {
+    const playerIndex = game.players.findIndex(p => p.id === data.playerId);
+    if (playerIndex === -1) return;
+    
+    if (data.action === 'fold') {
+        game.fold(playerIndex);
+    } else if (data.action === 'check') {
+        game.check(playerIndex);
+    } else if (data.action === 'call') {
+        game.call(playerIndex);
+    } else if (data.action === 'bet') {
+        game.bet(playerIndex, data.amount);
+    }
+    
+    rtc.broadcast({ type: 'game_update', state: game.getState() });
+    renderGame(game.getState());
+}
+
+function renderGame(state) {
+    const gameArea = document.getElementById('game-area');
+    
+    // コミュニティカード
+    let html = '<div style="text-align:center; margin:20px 0;">';
+    html += '<h3>コミュニティカード</h3>';
+    html += '<div style="font-size:32px;">';
+    state.community.forEach(card => {
+        html += `<span style="margin:0 5px;">${card.suit}${card.rank}</span>`;
+    });
+    html += '</div>';
+    html += `<div style="margin:10px 0;">ポット: ${state.pot}</div>`;
+    html += '</div>';
+    
+    // プレイヤー情報
+    html += '<div>';
+    state.players.forEach((p, i) => {
+        const isTurn = i === state.turnIndex;
+        const isDealer = i === state.dealerIndex;
+        html += `<div style="background:${isTurn ? '#005a9e' : '#333'}; padding:10px; margin:5px 0; border-radius:8px;">`;
+        html += `<div><strong>${p.name}</strong> ${isDealer ? '(D)' : ''}</div>`;
+        html += `<div>チップ: ${p.chips} | ベット: ${p.bet}</div>`;
+        
+        // 手札表示（自分のみ）
+        if (p.id === myPlayerId && p.hand && p.hand.length > 0) {
+            html += '<div style="font-size:24px; margin:5px 0;">';
+            p.hand.forEach(card => {
+                html += `<span style="margin:0 5px;">${card.suit}${card.rank}</span>`;
+            });
+            html += '</div>';
+            
+            // アクションボタン
+            if (isTurn && !p.folded) {
+                html += '<div style="margin-top:10px;">';
+                html += `<button onclick="sendAction('fold')" style="width:48%; margin:2px;">フォールド</button>`;
+                if (state.currentBet === p.bet) {
+                    html += `<button onclick="sendAction('check')" style="width:48%; margin:2px;">チェック</button>`;
+                } else {
+                    html += `<button onclick="sendAction('call')" style="width:48%; margin:2px;">コール(${state.currentBet - p.bet})</button>`;
+                }
+                html += `<button onclick="sendAction('bet', ${state.currentBet * 2})" style="width:48%; margin:2px;">レイズ</button>`;
+                html += '</div>';
+            }
+        }
+        
+        if (p.folded) {
+            html += '<div style="color:#888;">フォールド</div>';
+        }
+        
+        html += '</div>';
+    });
+    html += '</div>';
+    
+    gameArea.innerHTML = html;
+}
+
+window.sendAction = function(action, amount) {
+    rtc.send({ type: 'action', playerId: myPlayerId, action, amount });
+};
+
