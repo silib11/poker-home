@@ -357,14 +357,10 @@ function renderGame(state) {
     
     // ポジション名を取得
     const getPositionName = (index, dealerIndex, totalPlayers) => {
-        const sbIndex = (dealerIndex + 1) % totalPlayers;
-        const bbIndex = (dealerIndex + 2) % totalPlayers;
-        
         if (totalPlayers === 2) return null;
         if (totalPlayers === 3) return null; // D, SB, BBのみ
         
-        // 4人以上の場合
-        // BBの次から順にポジション名を割り当て
+        // ポジションの順序：D(0) → SB(1) → BB(2) → UTG(3) → HJ(4) → LJ(5) → CO(6) → D
         const positionsAfterBB = [];
         for (let i = 3; i < totalPlayers; i++) {
             const pos = (dealerIndex + i) % totalPlayers;
@@ -373,22 +369,22 @@ function renderGame(state) {
         
         if (totalPlayers === 4) {
             // D, SB, BB, CO
-            if (index === positionsAfterBB[0]) return 'CO';
+            if (index === positionsAfterBB[positionsAfterBB.length - 1]) return 'CO';
         } else if (totalPlayers === 5) {
             // D, SB, BB, UTG, CO
             if (index === positionsAfterBB[0]) return 'UTG';
-            if (index === positionsAfterBB[1]) return 'CO';
+            if (index === positionsAfterBB[positionsAfterBB.length - 1]) return 'CO';
         } else if (totalPlayers === 6) {
             // D, SB, BB, UTG, HJ, CO
             if (index === positionsAfterBB[0]) return 'UTG';
             if (index === positionsAfterBB[1]) return 'HJ';
-            if (index === positionsAfterBB[2]) return 'CO';
+            if (index === positionsAfterBB[positionsAfterBB.length - 1]) return 'CO';
         } else if (totalPlayers >= 7) {
             // D, SB, BB, UTG, HJ, LJ, CO
             if (index === positionsAfterBB[0]) return 'UTG';
             if (index === positionsAfterBB[1]) return 'HJ';
             if (index === positionsAfterBB[2]) return 'LJ';
-            if (index === positionsAfterBB[3]) return 'CO';
+            if (index === positionsAfterBB[positionsAfterBB.length - 1]) return 'CO';
         }
         
         return null;
