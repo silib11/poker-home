@@ -4,15 +4,15 @@ import { PokerGame } from './poker.js';
 const setupScreen = document.getElementById('setup-screen');
 const gameScreen = document.getElementById('game-screen');
 const status = document.getElementById('status');
+const roomIdInfo = document.getElementById('room-id-info');
 const createBtn = document.getElementById('create-room');
 const joinBtn = document.getElementById('join-room');
+const hostNameInput = document.getElementById('host-name');
 const playerNameInput = document.getElementById('player-name');
 const roomIdInput = document.getElementById('room-id-input');
 const buyinInput = document.getElementById('buyin-input');
 const sbInput = document.getElementById('sb-input');
 const bbInput = document.getElementById('bb-input');
-const roomInfo = document.getElementById('room-info');
-const roomIdDisplay = document.getElementById('room-id-display');
 const hostControls = document.getElementById('host-controls');
 const sbControl = document.getElementById('sb-control');
 const bbControl = document.getElementById('bb-control');
@@ -33,6 +33,12 @@ let gameState = {
 };
 
 createBtn.addEventListener('click', async () => {
+    const hostName = hostNameInput.value.trim();
+    if (!hostName) {
+        alert('名前を入力してください');
+        return;
+    }
+    
     isHost = true;
     const buyin = parseInt(buyinInput.value);
     const sb = parseInt(sbInput.value);
@@ -55,20 +61,24 @@ createBtn.addEventListener('click', async () => {
         currentRoomId = await rtc.createRoom();
         console.log('ルームID:', currentRoomId);
         
-        if (roomIdDisplay) {
-            roomIdDisplay.textContent = `ルームID: ${currentRoomId}`;
-            roomIdDisplay.style.fontSize = '20px';
-            roomIdDisplay.style.fontWeight = 'bold';
-        } else {
-            console.error('roomIdDisplay要素が見つかりません');
-            alert(`ルームID: ${currentRoomId}`);
-        }
+        // ホスト自身をプレイヤーとして追加
+        myPlayerId = Date.now().toString();
+        gameState.players.push({
+            id: myPlayerId,
+            name: hostName,
+            chips: gameState.buyin
+        });
         
-        if (roomInfo) {
-            roomInfo.style.display = 'block';
-        }
+        setupScreen.style.display = 'none';
+        gameScreen.style.display = 'block';
+        hostControls.style.display = 'block';
         
-        status.textContent = 'ルーム作成完了 - プレイヤー待機中';
+        roomIdInfo.textContent = `ルームID: ${currentRoomId}`;
+        sbControl.value = gameState.sb;
+        bbControl.value = gameState.bb;
+        
+        updatePlayersList();
+        status.textContent = `ルーム作成完了 - プレイヤー待機中`;
     } catch (err) {
         console.error('ルーム作成エラー:', err);
         status.textContent = 'エラー: ' + err.message;
@@ -89,6 +99,7 @@ joinBtn.addEventListener('click', async () => {
         return;
     }
     
+    currentRoomId = roomId;
     status.textContent = '接続中...';
     rtc = new WebRTCManager(false);
     
@@ -103,6 +114,7 @@ joinBtn.addEventListener('click', async () => {
     
     setupScreen.style.display = 'none';
     gameScreen.style.display = 'block';
+    roomIdInfo.textContent = `ルームID: ${roomId}`;
 });
 
 updateBlindsBtn.addEventListener('click', () => {
