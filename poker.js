@@ -220,7 +220,9 @@ export class PokerGame {
             currentBet: this.currentBet,
             phase: this.phase,
             turnIndex: this.turnIndex,
-            dealerIndex: this.dealerIndex
+            dealerIndex: this.dealerIndex,
+            sb: this.sb,
+            bb: this.bb
         };
     }
 

@@ -253,6 +253,36 @@ function renderGame(state) {
         return `<span style="display:inline-block; background:#fff; color:${getCardColor(card.suit)}; padding:8px 12px; margin:0 3px; border-radius:6px; font-size:28px; font-weight:bold; box-shadow:0 2px 4px rgba(0,0,0,0.3);">${card.suit}${card.rank}</span>`;
     };
     
+    // SHOWDOWN時の処理
+    if (state.phase === 'SHOWDOWN') {
+        let html = '<div style="text-align:center; margin:20px 0;">';
+        html += '<h2>ショウダウン</h2>';
+        html += `<div style="font-size:20px; margin:20px 0;">ポット: ${state.pot}</div>`;
+        
+        // 全プレイヤーの手札を表示
+        state.players.forEach(p => {
+            if (!p.folded) {
+                html += `<div style="background:#333; padding:15px; margin:10px 0; border-radius:8px;">`;
+                html += `<div style="font-size:18px; font-weight:bold;">${p.name}</div>`;
+                html += '<div style="margin:10px 0;">';
+                if (p.hand && p.hand.length > 0) {
+                    p.hand.forEach(card => html += renderCard(card));
+                }
+                html += '</div>';
+                html += `<div>チップ: ${p.chips}</div>`;
+                html += '</div>';
+            }
+        });
+        
+        if (isHost) {
+            html += `<button onclick="nextHand()" style="width:80%; padding:20px; font-size:18px; margin:20px 0;">次のハンド</button>`;
+        }
+        
+        html += '</div>';
+        gameArea.innerHTML = html;
+        return;
+    }
+    
     // コミュニティカード
     let html = '<div style="text-align:center; margin:20px 0;">';
     html += '<h3>コミュニティカード</h3>';
@@ -343,5 +373,31 @@ window.showRaiseInput = function(minAmount, maxAmount) {
     if (inputDiv) {
         inputDiv.style.display = 'block';
     }
+};
+
+window.nextHand = function() {
+    console.log('次のハンド開始');
+    
+    // チップ0のプレイヤーを除外
+    gameState.players = game.players.filter(p => p.chips > 0).map(p => ({
+        id: p.id,
+        name: p.name,
+        chips: p.chips
+    }));
+    
+    if (gameState.players.length < 2) {
+        alert('プレイヤーが足りません');
+        return;
+    }
+    
+    // 新しいゲーム開始
+    game = new PokerGame(gameState.players, gameState.sb, gameState.bb);
+    game.dealerIndex = (game.dealerIndex + 1) % game.players.length;
+    game.start();
+    
+    const state = game.getState();
+    rtc.broadcast({ type: 'game_start', state });
+    renderGame(state);
+    status.textContent = `新しいハンド - ${game.phase}`;
 };
 
