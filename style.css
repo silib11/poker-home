@@ -9,6 +9,8 @@ body {
     background: #1a1a1a;
     color: #fff;
     padding: 20px;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 #app {
@@ -16,11 +18,14 @@ body {
     margin: 0 auto;
 }
 
-h1 {
-    font-size: 24px;
-    margin-bottom: 20px;
+h1, h2, h3 {
     text-align: center;
+    margin: 20px 0;
 }
+
+h1 { font-size: 28px; }
+h2 { font-size: 20px; color: #888; }
+h3 { font-size: 18px; }
 
 #status {
     background: #333;
@@ -28,6 +33,13 @@ h1 {
     border-radius: 8px;
     margin-bottom: 20px;
     text-align: center;
+}
+
+label {
+    display: block;
+    margin: 10px 0 5px;
+    font-size: 14px;
+    color: #aaa;
 }
 
 button {
@@ -39,12 +51,17 @@ button {
     border: none;
     border-radius: 8px;
     font-size: 16px;
+    font-weight: 600;
+}
+
+button:active {
+    background: #0051d5;
 }
 
 input {
     width: 100%;
-    padding: 15px;
-    margin: 10px 0;
+    padding: 12px;
+    margin: 5px 0;
     background: #333;
     color: #fff;
     border: 1px solid #555;
@@ -52,25 +69,62 @@ input {
     font-size: 16px;
 }
 
-#room-id-display {
+#qr-section {
+    margin: 20px 0;
+    text-align: center;
+}
+
+#qr-code {
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    display: inline-block;
+    margin: 10px 0;
+}
+
+#room-url {
+    background: #2a2a2a;
+    padding: 10px;
+    border-radius: 8px;
+    word-break: break-all;
+    font-size: 12px;
+    margin: 10px 0;
+}
+
+#host-controls {
     background: #2a2a2a;
     padding: 15px;
     border-radius: 8px;
     margin: 10px 0;
-    word-break: break-all;
 }
 
-#messages {
-    margin-top: 20px;
+#host-controls label {
+    display: inline-block;
+    margin: 5px 10px 5px 0;
+}
+
+#host-controls input {
+    width: 80px;
+    display: inline-block;
+    padding: 8px;
+}
+
+#players-list {
     background: #2a2a2a;
     padding: 15px;
     border-radius: 8px;
-    min-height: 200px;
+    margin: 10px 0;
 }
 
-.message {
-    padding: 8px;
-    margin: 5px 0;
+.player-item {
     background: #333;
+    padding: 10px;
+    margin: 5px 0;
     border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+}
+
+#game-area {
+    margin: 20px 0;
 }

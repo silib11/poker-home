@@ -17,8 +17,7 @@ const db = getDatabase(app);
 export class WebRTCManager {
     constructor(isHost) {
         this.isHost = isHost;
-        this.pc = null;
-        this.dataChannel = null;
+        this.connections = [];
         this.onMessage = null;
         this.onConnected = null;
         this.onStatusChange = null;
@@ -26,89 +25,124 @@ export class WebRTCManager {
 
     async createRoom() {
         const roomId = Math.random().toString(36).substring(2, 8);
+        this.roomId = roomId;
         
-        this.pc = new RTCPeerConnection({
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-        });
-
-        this.dataChannel = this.pc.createDataChannel('poker');
-        this.setupDataChannel();
-
-        this.pc.onicecandidate = (e) => {
-            if (e.candidate) {
-                set(ref(db, `rooms/${roomId}/host/ice`), JSON.stringify(e.candidate));
-            }
-        };
-
-        const offer = await this.pc.createOffer();
-        await this.pc.setLocalDescription(offer);
-        await set(ref(db, `rooms/${roomId}/offer`), JSON.stringify(offer));
-
-        onValue(ref(db, `rooms/${roomId}/answer`), async (snapshot) => {
-            if (snapshot.val() && this.pc.remoteDescription === null) {
-                await this.pc.setRemoteDescription(JSON.parse(snapshot.val()));
-            }
-        });
-
-        onValue(ref(db, `rooms/${roomId}/guest/ice`), async (snapshot) => {
-            if (snapshot.val()) {
-                await this.pc.addIceCandidate(JSON.parse(snapshot.val()));
+        // Listen for new players
+        onValue(ref(db, `rooms/${roomId}/players`), (snapshot) => {
+            const players = snapshot.val();
+            if (players) {
+                Object.keys(players).forEach(playerId => {
+                    if (!this.connections.find(c => c.id === playerId)) {
+                        this.connectToPlayer(roomId, playerId);
+                    }
+                });
             }
         });
 
         return roomId;
     }
 
-    async joinRoom(roomId) {
-        this.pc = new RTCPeerConnection({
+    async connectToPlayer(roomId, playerId) {
+        const pc = new RTCPeerConnection({
             iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
         });
 
-        this.pc.ondatachannel = (e) => {
-            this.dataChannel = e.channel;
-            this.setupDataChannel();
-        };
+        const dataChannel = pc.createDataChannel('poker');
+        const conn = { id: playerId, pc, dataChannel };
+        this.connections.push(conn);
 
-        this.pc.onicecandidate = (e) => {
+        this.setupDataChannel(dataChannel);
+
+        pc.onicecandidate = (e) => {
             if (e.candidate) {
-                set(ref(db, `rooms/${roomId}/guest/ice`), JSON.stringify(e.candidate));
+                set(ref(db, `rooms/${roomId}/ice/host_${playerId}`), JSON.stringify(e.candidate));
             }
         };
 
-        onValue(ref(db, `rooms/${roomId}/offer`), async (snapshot) => {
-            if (snapshot.val() && this.pc.remoteDescription === null) {
-                await this.pc.setRemoteDescription(JSON.parse(snapshot.val()));
-                const answer = await this.pc.createAnswer();
-                await this.pc.setLocalDescription(answer);
-                await set(ref(db, `rooms/${roomId}/answer`), JSON.stringify(answer));
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        await set(ref(db, `rooms/${roomId}/offers/${playerId}`), JSON.stringify(offer));
+
+        onValue(ref(db, `rooms/${roomId}/answers/${playerId}`), async (snapshot) => {
+            if (snapshot.val() && pc.remoteDescription === null) {
+                await pc.setRemoteDescription(JSON.parse(snapshot.val()));
             }
         });
 
-        onValue(ref(db, `rooms/${roomId}/host/ice`), async (snapshot) => {
+        onValue(ref(db, `rooms/${roomId}/ice/player_${playerId}`), async (snapshot) => {
             if (snapshot.val()) {
-                await this.pc.addIceCandidate(JSON.parse(snapshot.val()));
+                await pc.addIceCandidate(JSON.parse(snapshot.val()));
             }
         });
     }
 
-    setupDataChannel() {
-        this.dataChannel.onopen = () => {
+    async joinRoom(roomId) {
+        const playerId = Math.random().toString(36).substring(2, 8);
+        this.playerId = playerId;
+        
+        await set(ref(db, `rooms/${roomId}/players/${playerId}`), true);
+
+        const pc = new RTCPeerConnection({
+            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        });
+
+        pc.ondatachannel = (e) => {
+            this.dataChannel = e.channel;
+            this.setupDataChannel(this.dataChannel);
+        };
+
+        pc.onicecandidate = (e) => {
+            if (e.candidate) {
+                set(ref(db, `rooms/${roomId}/ice/player_${playerId}`), JSON.stringify(e.candidate));
+            }
+        };
+
+        onValue(ref(db, `rooms/${roomId}/offers/${playerId}`), async (snapshot) => {
+            if (snapshot.val() && pc.remoteDescription === null) {
+                await pc.setRemoteDescription(JSON.parse(snapshot.val()));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                await set(ref(db, `rooms/${roomId}/answers/${playerId}`), JSON.stringify(answer));
+            }
+        });
+
+        onValue(ref(db, `rooms/${roomId}/ice/host_${playerId}`), async (snapshot) => {
+            if (snapshot.val()) {
+                await pc.addIceCandidate(JSON.parse(snapshot.val()));
+            }
+        });
+
+        this.pc = pc;
+    }
+
+    setupDataChannel(channel) {
+        channel.onopen = () => {
             if (this.onStatusChange) this.onStatusChange('接続完了');
             if (this.onConnected) this.onConnected();
         };
 
-        this.dataChannel.onmessage = (e) => {
+        channel.onmessage = (e) => {
             if (this.onMessage) this.onMessage(e.data);
         };
 
-        this.dataChannel.onclose = () => {
+        channel.onclose = () => {
             if (this.onStatusChange) this.onStatusChange('切断');
         };
     }
 
     send(data) {
+        const msg = typeof data === 'string' ? data : JSON.stringify(data);
         if (this.dataChannel && this.dataChannel.readyState === 'open') {
-            this.dataChannel.send(typeof data === 'string' ? data : JSON.stringify(data));
+            this.dataChannel.send(msg);
         }
+    }
+
+    broadcast(data) {
+        const msg = typeof data === 'string' ? data : JSON.stringify(data);
+        this.connections.forEach(conn => {
+            if (conn.dataChannel && conn.dataChannel.readyState === 'open') {
+                conn.dataChannel.send(msg);
+            }
+        });
     }
 }
