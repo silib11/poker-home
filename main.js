@@ -216,7 +216,7 @@ function handlePlayerAction(data) {
         return;
     }
     
-    console.log('アクション実行:', data.action);
+    console.log('アクション実行:', data.action, 'amount:', data.amount);
     
     if (data.action === 'fold') {
         game.fold(playerIndex);
@@ -225,12 +225,16 @@ function handlePlayerAction(data) {
     } else if (data.action === 'call') {
         game.call(playerIndex);
     } else if (data.action === 'bet') {
-        game.bet(playerIndex, data.amount);
+        game.bet(playerIndex, parseInt(data.amount));
     }
     
     const newState = game.getState();
     console.log('新しい状態:', newState.phase, 'ターン:', newState.turnIndex);
+    
+    // 全プレイヤーに送信
     rtc.broadcast({ type: 'game_update', state: newState });
+    
+    // ホスト自身も更新
     renderGame(newState);
     status.textContent = `${newState.phase} - ポット: ${newState.pot}`;
 }
@@ -281,12 +285,28 @@ function renderGame(state) {
             if (isTurn && !p.folded) {
                 html += '<div style="margin-top:10px;">';
                 html += `<button onclick="sendAction('fold')" style="width:48%; margin:2px;">フォールド</button>`;
-                if (state.currentBet === p.bet) {
+                
+                if (state.currentBet === 0 || state.currentBet === p.bet) {
+                    // チェックできる
                     html += `<button onclick="sendAction('check')" style="width:48%; margin:2px;">チェック</button>`;
                 } else {
-                    html += `<button onclick="sendAction('call')" style="width:48%; margin:2px;">コール(${state.currentBet - p.bet})</button>`;
+                    // コールが必要
+                    const callAmount = state.currentBet - p.bet;
+                    html += `<button onclick="sendAction('call')" style="width:48%; margin:2px;">コール(${callAmount})</button>`;
                 }
-                html += `<button onclick="sendAction('bet', ${state.currentBet * 2})" style="width:48%; margin:2px;">レイズ</button>`;
+                
+                // ベット/レイズ
+                const minRaise = state.currentBet === 0 ? state.bb : state.currentBet * 2;
+                const raiseAmount = Math.min(minRaise, p.chips);
+                if (raiseAmount > 0) {
+                    const label = state.currentBet === 0 ? 'ベット' : 'レイズ';
+                    html += `<button onclick="showRaiseInput(${raiseAmount}, ${p.chips})" style="width:98%; margin:2px;">${label}(${raiseAmount})</button>`;
+                    html += `<div id="raise-input-${i}" style="display:none; margin:5px 0;">`;
+                    html += `<input type="number" id="raise-amount-${i}" value="${raiseAmount}" min="${raiseAmount}" max="${p.chips}" step="10" style="width:60%;">`;
+                    html += `<button onclick="sendAction('bet', document.getElementById('raise-amount-${i}').value)" style="width:35%; margin-left:5px;">確定</button>`;
+                    html += `</div>`;
+                }
+                
                 html += '</div>';
             }
         }
@@ -304,6 +324,17 @@ function renderGame(state) {
 
 window.sendAction = function(action, amount) {
     console.log('sendAction:', action, amount, 'myPlayerId:', myPlayerId);
-    rtc.send({ type: 'action', playerId: myPlayerId, action, amount });
+    const amountNum = amount ? parseInt(amount) : 0;
+    rtc.send({ type: 'action', playerId: myPlayerId, action, amount: amountNum });
+};
+
+window.showRaiseInput = function(minAmount, maxAmount) {
+    // すべての入力欄を非表示
+    document.querySelectorAll('[id^="raise-input-"]').forEach(el => el.style.display = 'none');
+    // 該当の入力欄を表示
+    const inputDiv = event.target.nextElementSibling;
+    if (inputDiv) {
+        inputDiv.style.display = 'block';
+    }
 };
 
