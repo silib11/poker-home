@@ -355,6 +355,45 @@ function renderGame(state) {
         return { x, y };
     };
     
+    // ポジション名を取得
+    const getPositionName = (index, dealerIndex, totalPlayers) => {
+        const sbIndex = (dealerIndex + 1) % totalPlayers;
+        const bbIndex = (dealerIndex + 2) % totalPlayers;
+        
+        if (totalPlayers === 2) return null;
+        if (totalPlayers === 3) return null; // D, SB, BBのみ
+        
+        // 4人以上の場合
+        // BBの次から順にポジション名を割り当て
+        const positionsAfterBB = [];
+        for (let i = 3; i < totalPlayers; i++) {
+            const pos = (dealerIndex + i) % totalPlayers;
+            positionsAfterBB.push(pos);
+        }
+        
+        if (totalPlayers === 4) {
+            // D, SB, BB, CO
+            if (index === positionsAfterBB[0]) return 'CO';
+        } else if (totalPlayers === 5) {
+            // D, SB, BB, UTG, CO
+            if (index === positionsAfterBB[0]) return 'UTG';
+            if (index === positionsAfterBB[1]) return 'CO';
+        } else if (totalPlayers === 6) {
+            // D, SB, BB, UTG, HJ, CO
+            if (index === positionsAfterBB[0]) return 'UTG';
+            if (index === positionsAfterBB[1]) return 'HJ';
+            if (index === positionsAfterBB[2]) return 'CO';
+        } else if (totalPlayers >= 7) {
+            // D, SB, BB, UTG, HJ, LJ, CO
+            if (index === positionsAfterBB[0]) return 'UTG';
+            if (index === positionsAfterBB[1]) return 'HJ';
+            if (index === positionsAfterBB[2]) return 'LJ';
+            if (index === positionsAfterBB[3]) return 'CO';
+        }
+        
+        return null;
+    };
+    
     // WINNER時の処理（フォールドで勝利、手札非公開）
     if (state.phase === 'WINNER') {
         let html = '<div style="text-align:center; margin:20px 0;">';
@@ -477,6 +516,14 @@ function renderGame(state) {
         if (isDealer) badges += '<span class="blind-badge" style="background:#ffd700;">D</span>';
         if (isSB) badges += '<span class="blind-badge">SB</span>';
         if (isBB) badges += '<span class="blind-badge">BB</span>';
+        
+        // その他のポジション（3人以上の場合）
+        if (!isDealer && !isSB && !isBB && state.players.length >= 3) {
+            const position = getPositionName(i, state.dealerIndex, state.players.length);
+            if (position) {
+                badges += `<span class="blind-badge" style="background:#666;">${position}</span>`;
+            }
+        }
         
         html += `<div class="${seatClass}" style="left:${pos.x}%; top:${pos.y}%; transform:translate(-50%, -50%);">`;
         html += `<div style="font-weight:bold; font-size:13px;">${p.name} ${badges}</div>`;
