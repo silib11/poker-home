@@ -14,7 +14,7 @@ const updateBlindsBtn = document.getElementById('update-blinds');
 const startGameBtn = document.getElementById('start-game');
 const playersList = document.getElementById('players-list');
 
-let hostJoinBtn, hostNameInput, buyinInput, sbInput, bbInput, roomInfo, roomUrl;
+let hostJoinBtn, hostNameInput, buyinInput, sbInput, bbInput, roomInfo, roomUrl, copyUrlBtn, currentRoomUrl;
 
 let rtc;
 let isHost = false;
@@ -42,6 +42,7 @@ if (roomIdFromUrl) {
     bbInput = document.getElementById('bb-input');
     roomInfo = document.getElementById('room-info');
     roomUrl = document.getElementById('room-url');
+    copyUrlBtn = document.getElementById('copy-url');
 }
 
 if (createBtn) {
@@ -65,12 +66,27 @@ if (createBtn) {
     const roomId = await rtc.createRoom();
     const url = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
     
-    roomUrl.textContent = `ルームURL: ${url}`;
+    currentRoomUrl = url;
+    roomUrl.textContent = `ルームID: ${roomId}`;
     roomInfo.style.display = 'block';
     createBtn.disabled = true;
     
     status.textContent = 'ルーム作成完了';
 });
+}
+
+if (copyUrlBtn) {
+    copyUrlBtn.addEventListener('click', async () => {
+        try {
+            await navigator.clipboard.writeText(currentRoomUrl);
+            copyUrlBtn.textContent = 'コピー完了！';
+            setTimeout(() => {
+                copyUrlBtn.textContent = 'URLをコピー';
+            }, 2000);
+        } catch (err) {
+            alert('コピーに失敗しました: ' + currentRoomUrl);
+        }
+    });
 }
 
 if (hostJoinBtn) {
