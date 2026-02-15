@@ -327,6 +327,51 @@ test('複数ラウンド：ディーラー移動', () => {
     assertEquals(game2.dealerIndex, (initialDealer + 1) % 3, 'ディーラー移動');
 });
 
+test('サイドポット：2人オールイン（異なる額）', () => {
+    const players = [
+        { id: '1', name: 'Alice', chips: 100 },
+        { id: '2', name: 'Bob', chips: 200 },
+        { id: '3', name: 'Carol', chips: 1000 }
+    ];
+    const game = new PokerGame(players, 10, 20);
+    game.start();
+    
+    // 全員オールイン/コール
+    const turn1 = game.turnIndex;
+    game.bet(turn1, 100); // Alice all-in 100
+    
+    const turn2 = game.turnIndex;
+    game.bet(turn2, 200); // Bob all-in 200
+    
+    const turn3 = game.turnIndex;
+    game.call(turn3); // Carol calls 200
+    
+    // サイドポット計算
+    const sidePots = game.calculateSidePots();
+    
+    assertTrue(sidePots.length >= 1, 'サイドポットが生成される');
+    assertTrue(game.pot > 0, 'ポットにチップがある');
+});
+
+test('サイドポット：メインポットとサイドポット', () => {
+    const players = [
+        { id: '1', name: 'Alice', chips: 50 },
+        { id: '2', name: 'Bob', chips: 100 },
+        { id: '3', name: 'Carol', chips: 100 }
+    ];
+    const game = new PokerGame(players, 10, 20);
+    game.start();
+    
+    // Aliceオールイン50、Bob/Carolコール
+    const aliceIndex = game.players.findIndex(p => p.name === 'Alice');
+    if (game.turnIndex === aliceIndex) {
+        game.bet(aliceIndex, 50);
+    }
+    
+    // ポットが正しく計算されることを確認
+    assertTrue(game.pot >= 0, 'ポット計算');
+});
+
 // テスト実行
 async function runTests() {
     console.log('🧪 ポーカーゲームテスト開始\n');

@@ -423,8 +423,42 @@ function renderGame(state) {
         let html = '<div style="text-align:center; margin:20px 0;">';
         html += '<h2>🏆 ショウダウン 🏆</h2>';
         
-        // 勝者情報
-        if (state.winner) {
+        // サイドポット結果表示
+        if (state.potResults && state.potResults.length > 0) {
+            // ポットごとにグループ化
+            const potGroups = {};
+            state.potResults.forEach(r => {
+                if (!potGroups[r.potType]) {
+                    potGroups[r.potType] = [];
+                }
+                potGroups[r.potType].push(r);
+            });
+            
+            // メインポット
+            if (potGroups['main']) {
+                html += `<div style="background:#1a4d1a; padding:15px; margin:15px 0; border-radius:8px; border:2px solid #ffd700;">`;
+                html += `<div style="font-size:18px; font-weight:bold; color:#ffd700;">メインポット</div>`;
+                potGroups['main'].forEach(r => {
+                    html += `<div style="font-size:20px; margin:5px 0;">${r.player.name} 👑</div>`;
+                    html += `<div style="font-size:16px; margin:5px 0;">${r.handName}</div>`;
+                    html += `<div style="font-size:18px; margin:5px 0;">獲得: <span style="color:#00ff00; font-weight:bold;">+${r.amount}</span></div>`;
+                });
+                html += `</div>`;
+            }
+            
+            // サイドポット
+            Object.keys(potGroups).filter(k => k !== 'main').forEach((potType, idx) => {
+                html += `<div style="background:#2a4d2a; padding:15px; margin:15px 0; border-radius:8px; border:2px solid #88aa88;">`;
+                html += `<div style="font-size:16px; font-weight:bold; color:#88aa88;">サイドポット ${idx + 1}</div>`;
+                potGroups[potType].forEach(r => {
+                    html += `<div style="font-size:18px; margin:5px 0;">${r.player.name}</div>`;
+                    html += `<div style="font-size:14px; margin:5px 0;">${r.handName}</div>`;
+                    html += `<div style="font-size:16px; margin:5px 0;">獲得: <span style="color:#00ff00; font-weight:bold;">+${r.amount}</span></div>`;
+                });
+                html += `</div>`;
+            });
+        } else if (state.winner) {
+            // 従来の表示（サイドポットなし）
             html += `<div style="background:#1a4d1a; padding:15px; margin:15px 0; border-radius:8px; border:2px solid #ffd700;">`;
             html += `<div style="font-size:24px; font-weight:bold; color:#ffd700;">勝者: ${state.winner.name}</div>`;
             html += `<div style="font-size:18px; margin:5px 0;">${state.winningHand || ''}</div>`;
@@ -443,7 +477,8 @@ function renderGame(state) {
         // 全プレイヤーの手札を表示
         state.players.forEach(p => {
             if (!p.folded) {
-                const isWinner = state.winner && p.id === state.winner.id;
+                const wonPot = state.potResults && state.potResults.find(r => r.player.id === p.id);
+                const isWinner = wonPot !== undefined;
                 html += `<div style="background:${isWinner ? '#1a4d1a' : '#333'}; padding:15px; margin:10px 0; border-radius:8px; border:${isWinner ? '2px solid #ffd700' : 'none'};">`;
                 html += `<div style="font-size:18px; font-weight:bold;">${p.name} ${isWinner ? '👑' : ''}</div>`;
                 html += '<div style="margin:10px 0;">';

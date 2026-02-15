@@ -7,7 +7,8 @@ export class PokerGame {
             folded: false,
             position: i,
             acted: false,
-            lastAction: null
+            lastAction: null,
+            totalBetThisHand: 0
         }));
         this.sb = sb;
         this.bb = bb;
@@ -19,6 +20,8 @@ export class PokerGame {
         this.turnIndex = 0;
         this.dealerIndex = 0;
         this.lastRaiserIndex = -1;
+        this.sidePots = [];
+        this.potResults = [];
     }
 
     // 山札生成
@@ -46,16 +49,23 @@ export class PokerGame {
         this.createDeck();
         this.shuffle();
         
+        // totalBetThisHandをリセット
+        this.players.forEach(p => {
+            p.totalBetThisHand = 0;
+        });
+        
         // ブラインド設定
         const sbIndex = (this.dealerIndex + 1) % this.players.length;
         const bbIndex = (this.dealerIndex + 2) % this.players.length;
         
         this.players[sbIndex].chips -= this.sb;
         this.players[sbIndex].bet = this.sb;
+        this.players[sbIndex].totalBetThisHand = this.sb;
         this.players[sbIndex].acted = false;
         
         this.players[bbIndex].chips -= this.bb;
         this.players[bbIndex].bet = this.bb;
+        this.players[bbIndex].totalBetThisHand = this.bb;
         this.players[bbIndex].acted = false;
         
         this.currentBet = this.bb;
@@ -77,6 +87,7 @@ export class PokerGame {
         
         player.chips -= totalBet;
         player.bet += totalBet;
+        player.totalBetThisHand += totalBet;
         player.acted = true;
         
         // オールインかどうか判定
@@ -108,6 +119,7 @@ export class PokerGame {
         
         player.chips -= toCall;
         player.bet += toCall;
+        player.totalBetThisHand += toCall;
         player.acted = true;
         
         // オールインかどうか判定
@@ -224,7 +236,7 @@ export class PokerGame {
         }
     }
 
-    // 勝者決定（簡易版）
+    // 勝者決定（サイドポット対応）
     determineWinner() {
         const activePlayers = this.players.filter(p => !p.folded);
         
@@ -233,26 +245,119 @@ export class PokerGame {
             activePlayers[0].chips += winAmount;
             this.winner = activePlayers[0];
             this.winAmount = winAmount;
+            this.sidePots = [];
             return activePlayers[0];
         }
         
-        // 役判定して勝者決定
-        const ranked = activePlayers.map(p => ({
+        // サイドポット計算
+        const sidePots = this.calculateSidePots();
+        
+        // 各ポットの勝者を決定
+        const results = [];
+        for (const pot of sidePots) {
+            const eligiblePlayers = pot.eligiblePlayers.filter(p => !p.folded);
+            
+            if (eligiblePlayers.length === 0) continue;
+            
+            if (eligiblePlayers.length === 1) {
+                eligiblePlayers[0].chips += pot.amount;
+                results.push({
+                    player: eligiblePlayers[0],
+                    amount: pot.amount,
+                    handName: this.getHandName(eligiblePlayers[0].hand),
+                    potType: pot.type
+                });
+                continue;
+            }
+            
+            // 役判定
+            const ranked = eligiblePlayers.map(p => ({
+                player: p,
+                rank: this.evaluateHand(p.hand),
+                handName: this.getHandName(p.hand)
+            }));
+            
+            ranked.sort((a, b) => b.rank - a.rank);
+            
+            // 同順位の処理（チョップ）
+            const topRank = ranked[0].rank;
+            const winners = ranked.filter(r => r.rank === topRank);
+            const splitAmount = Math.floor(pot.amount / winners.length);
+            
+            winners.forEach(w => {
+                w.player.chips += splitAmount;
+                results.push({
+                    player: w.player,
+                    amount: splitAmount,
+                    handName: w.handName,
+                    potType: pot.type
+                });
+            });
+        }
+        
+        // メインポットの勝者を代表として設定
+        const mainPotWinner = results.find(r => r.potType === 'main');
+        if (mainPotWinner) {
+            this.winner = mainPotWinner.player;
+            this.winAmount = results.filter(r => r.player.id === mainPotWinner.player.id)
+                .reduce((sum, r) => sum + r.amount, 0);
+            this.winningHand = mainPotWinner.handName;
+        } else if (results.length > 0) {
+            this.winner = results[0].player;
+            this.winAmount = results[0].amount;
+            this.winningHand = results[0].handName;
+        }
+        
+        this.sidePots = sidePots;
+        this.potResults = results;
+        
+        return this.winner;
+    }
+    
+    // サイドポット計算
+    calculateSidePots() {
+        const pots = [];
+        const playerBets = this.players.map((p, i) => ({
             player: p,
-            rank: this.evaluateHand(p.hand),
-            handName: this.getHandName(p.hand)
-        }));
+            index: i,
+            totalBet: p.totalBetThisHand || 0
+        })).filter(pb => pb.totalBet > 0);
         
-        ranked.sort((a, b) => b.rank - a.rank);
-        const winner = ranked[0].player;
-        const winAmount = this.pot;
-        winner.chips += winAmount;
+        if (playerBets.length === 0) return pots;
         
-        this.winner = winner;
-        this.winAmount = winAmount;
-        this.winningHand = ranked[0].handName;
+        // ベット額でソート
+        playerBets.sort((a, b) => a.totalBet - b.totalBet);
         
-        return winner;
+        let remainingPot = this.pot;
+        let previousBet = 0;
+        
+        for (let i = 0; i < playerBets.length; i++) {
+            const currentBet = playerBets[i].totalBet;
+            const betDiff = currentBet - previousBet;
+            
+            if (betDiff > 0) {
+                const eligiblePlayers = playerBets.slice(i).map(pb => pb.player);
+                const potAmount = betDiff * eligiblePlayers.length;
+                
+                if (potAmount > 0 && potAmount <= remainingPot) {
+                    pots.push({
+                        amount: potAmount,
+                        eligiblePlayers: eligiblePlayers,
+                        type: i === 0 ? 'main' : `side${i}`
+                    });
+                    remainingPot -= potAmount;
+                }
+            }
+            
+            previousBet = currentBet;
+        }
+        
+        // 残りがあればメインポットに追加
+        if (remainingPot > 0 && pots.length > 0) {
+            pots[0].amount += remainingPot;
+        }
+        
+        return pots;
     }
     
     // 役名を取得
@@ -409,7 +514,9 @@ export class PokerGame {
             bb: this.bb,
             winner: this.winner,
             winAmount: this.winAmount,
-            winningHand: this.winningHand
+            winningHand: this.winningHand,
+            sidePots: this.sidePots,
+            potResults: this.potResults
         };
     }
 
