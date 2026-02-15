@@ -134,7 +134,7 @@ input[type="range"] {
     -webkit-appearance: none;
     appearance: none;
     height: 8px;
-    background: linear-gradient(to right, #007aff 0%, #007aff 50%, #555 50%, #555 100%);
+    background: #007aff;
     border-radius: 5px;
     outline: none;
 }
@@ -144,8 +144,8 @@ input[type="range"]::-webkit-slider-thumb {
     appearance: none;
     width: 24px;
     height: 24px;
-    background: #007aff;
-    border: 3px solid #fff;
+    background: #fff;
+    border: 3px solid #007aff;
     border-radius: 50%;
     cursor: pointer;
     box-shadow: 0 2px 4px rgba(0,0,0,0.3);
@@ -154,8 +154,8 @@ input[type="range"]::-webkit-slider-thumb {
 input[type="range"]::-moz-range-thumb {
     width: 24px;
     height: 24px;
-    background: #007aff;
-    border: 3px solid #fff;
+    background: #fff;
+    border: 3px solid #007aff;
     border-radius: 50%;
     cursor: pointer;
     box-shadow: 0 2px 4px rgba(0,0,0,0.3);

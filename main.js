@@ -188,6 +188,21 @@ function handleMessage(msg) {
         status.textContent = `ゲーム開始 - ${data.state.phase}`;
     }
     
+    if (data.type === 'game_over') {
+        showGameOver();
+    }
+    
+    if (data.type === 'game_restart') {
+        // チップをリセット
+        gameState.players = gameState.players.map(p => ({
+            ...p,
+            chips: data.buyin
+        }));
+        updatePlayersList();
+        renderGame(data.state);
+        status.textContent = `ゲーム再開 - ${data.state.phase}`;
+    }
+    
     if (data.type === 'ready_next_hand' && isHost) {
         nextHandReady.add(data.playerId);
         checkAllReady();
@@ -408,14 +423,16 @@ function renderGame(state) {
                 'check': '#66ff66',
                 'call': '#ffff66',
                 'bet': '#ff9966',
-                'raise': '#ff9966'
+                'raise': '#ff9966',
+                'allin': '#ff0000'
             };
             const actionLabels = {
                 'fold': 'フォールド',
                 'check': 'チェック',
                 'call': 'コール',
                 'bet': 'ベット',
-                'raise': 'レイズ'
+                'raise': 'レイズ',
+                'allin': 'オールイン'
             };
             const color = actionColors[p.lastAction] || '#aaa';
             const label = actionLabels[p.lastAction] || p.lastAction;
@@ -564,7 +581,8 @@ function startNextHand() {
     }));
     
     if (gameState.players.length < 2) {
-        alert('プレイヤーが足りません');
+        // ゲーム終了
+        showGameOver();
         return;
     }
     
@@ -582,6 +600,49 @@ function startNextHand() {
     renderGame(state);
     status.textContent = `新しいハンド - ${game.phase}`;
 }
+
+function showGameOver() {
+    const gameArea = document.getElementById('game-area');
+    let html = '<div style="text-align:center; margin:20px 0;">';
+    html += '<h2>🎉 ゲーム終了 🎉</h2>';
+    
+    if (gameState.players.length === 1) {
+        html += `<div style="font-size:28px; font-weight:bold; color:#ffd700; margin:20px 0;">優勝: ${gameState.players[0].name}</div>`;
+        html += `<div style="font-size:20px; margin:10px 0;">最終チップ: ${gameState.players[0].chips}</div>`;
+    } else {
+        html += `<div style="font-size:20px; margin:20px 0;">プレイヤーが足りません</div>`;
+    }
+    
+    if (isHost) {
+        html += `<button onclick="restartGame()" style="width:80%; padding:20px; font-size:18px; margin:20px 0; background:#00aa00;">新しいゲームを開始</button>`;
+    } else {
+        html += `<div style="margin:20px 0; color:#aaa;">ホストが新しいゲームを開始するまでお待ちください</div>`;
+    }
+    
+    html += '</div>';
+    gameArea.innerHTML = html;
+    status.textContent = 'ゲーム終了';
+    
+    rtc.broadcast({ type: 'game_over' });
+}
+
+window.restartGame = function() {
+    // 全プレイヤーのチップをリセット
+    gameState.players = gameState.players.map(p => ({
+        ...p,
+        chips: gameState.buyin
+    }));
+    
+    // 新しいゲーム開始
+    game = new PokerGame(gameState.players, gameState.sb, gameState.bb);
+    game.start();
+    
+    const state = game.getState();
+    rtc.broadcast({ type: 'game_restart', state, buyin: gameState.buyin });
+    renderGame(state);
+    updatePlayersList();
+    status.textContent = `ゲーム再開 - ${game.phase}`;
+};
 
 window.nextHand = function() {
     console.log('次のハンド開始（旧関数）');

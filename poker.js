@@ -80,15 +80,19 @@ export class PokerGame {
         player.chips -= totalBet;
         player.bet += totalBet;
         player.acted = true;
-        player.lastAction = player.bet > this.currentBet ? 'raise' : 'bet';
+        
+        // オールインかどうか判定
+        const isAllIn = player.chips === 0;
+        player.lastAction = isAllIn ? 'allin' : (player.bet > this.currentBet ? 'raise' : 'bet');
+        
         this.pot += totalBet;
         
         if (player.bet > this.currentBet) {
             this.currentBet = player.bet;
             this.lastRaiserIndex = playerIndex;
-            // レイズされたら他のプレイヤーのactedをリセット
+            // レイズされたら他のプレイヤーのactedをリセット（オールインは除く）
             this.players.forEach((p, i) => {
-                if (i !== playerIndex && !p.folded) {
+                if (i !== playerIndex && !p.folded && p.chips > 0) {
                     p.acted = false;
                 }
             });
@@ -151,9 +155,9 @@ export class PokerGame {
             return;
         }
         
-        // 全員アクション済みかつベット額が揃っているかチェック
-        const allActed = activePlayers.every(p => p.acted);
-        const allBetsEqual = activePlayers.every(p => p.bet === this.currentBet || p.chips === 0);
+        // アクション可能なプレイヤー全員がアクション済みかつベット額が揃っているかチェック
+        const allActed = playersCanAct.every(p => p.acted);
+        const allBetsEqual = playersCanAct.every(p => p.bet === this.currentBet);
         
         if (allActed && allBetsEqual) {
             this.nextPhase();
@@ -161,9 +165,19 @@ export class PokerGame {
         }
         
         // 次のプレイヤー（フォールドまたはオールインしていない人）
+        let nextIndex = this.turnIndex;
+        let attempts = 0;
         do {
-            this.turnIndex = (this.turnIndex + 1) % this.players.length;
-        } while (this.players[this.turnIndex].folded || this.players[this.turnIndex].chips === 0);
+            nextIndex = (nextIndex + 1) % this.players.length;
+            attempts++;
+            if (attempts > this.players.length) {
+                // 無限ループ防止
+                this.nextPhase();
+                return;
+            }
+        } while (this.players[nextIndex].folded || this.players[nextIndex].chips === 0);
+        
+        this.turnIndex = nextIndex;
     }
 
     // 次のフェーズ
