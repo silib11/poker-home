@@ -51,11 +51,18 @@ createBtn.addEventListener('click', async () => {
         status.textContent = `接続: ${gameState.players.length}人`;
     };
     
-    currentRoomId = await rtc.createRoom();
-    roomIdDisplay.textContent = `ルームID: ${currentRoomId}`;
-    roomInfo.style.display = 'block';
-    
-    status.textContent = 'ルーム作成完了 - プレイヤー待機中';
+    try {
+        currentRoomId = await rtc.createRoom();
+        console.log('ルームID:', currentRoomId);
+        roomIdDisplay.textContent = `ルームID: ${currentRoomId}`;
+        roomIdDisplay.style.fontSize = '20px';
+        roomIdDisplay.style.fontWeight = 'bold';
+        roomInfo.style.display = 'block';
+        status.textContent = 'ルーム作成完了 - プレイヤー待機中';
+    } catch (err) {
+        console.error('ルーム作成エラー:', err);
+        status.textContent = 'エラー: ' + err.message;
+    }
 });
 
 joinBtn.addEventListener('click', async () => {

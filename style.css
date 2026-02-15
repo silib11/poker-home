@@ -76,12 +76,13 @@ input {
     margin: 10px 0;
 }
 
-#room-url {
+#room-id-display {
     background: #333;
-    padding: 10px;
+    padding: 15px;
     border-radius: 8px;
-    word-break: break-all;
-    font-size: 12px;
+    text-align: center;
+    font-size: 20px;
+    font-weight: bold;
     margin: 10px 0;
 }
 
