@@ -508,6 +508,40 @@ test('オールイン：オールイン後にチェック不可', () => {
     }
 });
 
+test('オールイン：ヘッズアップでオールイン後のアクション', () => {
+    const players = [
+        { id: '1', name: 'Alice', chips: 100 },
+        { id: '2', name: 'Bob', chips: 1000 }
+    ];
+    const game = new PokerGame(players, 10, 20);
+    game.start();
+    
+    const aliceIndex = game.players.findIndex(p => p.name === 'Alice');
+    const bobIndex = game.players.findIndex(p => p.name === 'Bob');
+    
+    // Bobがコール
+    let turn = game.turnIndex;
+    if (turn === bobIndex) {
+        game.call(turn);
+        turn = game.turnIndex;
+    }
+    
+    // Aliceがオールイン
+    if (turn === aliceIndex && game.phase === 'PREFLOP') {
+        game.bet(turn, game.players[aliceIndex].chips);
+        
+        // まだPREFLOPでBobのアクションを待つ
+        assertEquals(game.phase, 'PREFLOP', 'まだPREFLOP');
+        assertEquals(game.turnIndex, bobIndex, 'Bobのターン');
+        
+        // Bobがコール
+        game.call(bobIndex);
+        
+        // フェーズが進行
+        assertTrue(game.phase !== 'PREFLOP', 'フェーズ進行');
+    }
+});
+
 // テスト実行
 async function runTests() {
     console.log('💥 オールインテスト開始\n');

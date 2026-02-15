@@ -169,12 +169,6 @@ export class PokerGame {
         // アクション可能なプレイヤー（チップが残っている）
         const playersCanAct = activePlayers.filter(p => p.chips > 0);
         
-        // アクション可能なプレイヤーが1人以下ならフェーズ進行
-        if (playersCanAct.length <= 1) {
-            this.nextPhase();
-            return;
-        }
-        
         // ベットラウンド終了判定
         // 全員がアクション済み かつ ベット額が揃っている（オールインは除く）
         const allActed = playersCanAct.every(p => p.acted);
@@ -183,6 +177,12 @@ export class PokerGame {
         );
         
         if (allActed && allBetsMatched) {
+            this.nextPhase();
+            return;
+        }
+        
+        // アクション可能なプレイヤーが0人ならフェーズ進行
+        if (playersCanAct.length === 0) {
             this.nextPhase();
             return;
         }
