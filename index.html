@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>ポーカー接続テスト</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <h1>ポーカー接続テスト</h1>
+        <div id="status">待機中...</div>
+        
+        <div id="host-section">
+            <button id="create-room">ルーム作成（ホスト）</button>
+            <div id="room-id-display"></div>
+        </div>
+        
+        <div id="join-section">
+            <input type="text" id="room-id-input" placeholder="ルームID">
+            <button id="join-room">参加</button>
+        </div>
+        
+        <div id="test-section" style="display:none;">
+            <input type="text" id="message-input" placeholder="メッセージ">
+            <button id="send-message">送信</button>
+        </div>
+        
+        <div id="messages"></div>
+    </div>
+    
+    <script type="module" src="main.js"></script>
+</body>
+</html>
