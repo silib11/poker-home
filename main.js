@@ -345,6 +345,16 @@ function renderGame(state) {
         return `<span style="display:inline-block; background:#fff; color:${getCardColor(card.suit)}; padding:8px 12px; margin:0 3px; border-radius:6px; font-size:28px; font-weight:bold; box-shadow:0 2px 4px rgba(0,0,0,0.3);">${card.suit}${card.rank}</span>`;
     };
     
+    // プレイヤーの座席位置を計算（円形配置）
+    const getPlayerPosition = (index, total) => {
+        const angle = (index / total) * 2 * Math.PI - Math.PI / 2;
+        const radiusX = 45; // 横方向の半径（%）
+        const radiusY = 40; // 縦方向の半径（%）
+        const x = 50 + radiusX * Math.cos(angle);
+        const y = 50 + radiusY * Math.sin(angle);
+        return { x, y };
+    };
+    
     // WINNER時の処理（フォールドで勝利、手札非公開）
     if (state.phase === 'WINNER') {
         let html = '<div style="text-align:center; margin:20px 0;">';
@@ -429,132 +439,112 @@ function renderGame(state) {
         return;
     }
     
-    // コミュニティカード
-    let html = '<div style="text-align:center; margin:20px 0;">';
-    html += '<h3>コミュニティカード</h3>';
-    html += '<div>';
+    // ポーカーテーブル
+    let html = '<div id="poker-table">';
+    
+    // テーブル中央（コミュニティカード＋ポット）
+    html += '<div class="table-center">';
+    html += '<div style="margin:10px 0;">';
     state.community.forEach(card => {
         html += renderCard(card);
     });
     html += '</div>';
     
-    // ポット表示（現在のベット総額も含む）
     const currentBets = state.players.reduce((sum, p) => sum + p.bet, 0);
     const totalPot = state.pot + currentBets;
-    html += `<div style="margin:10px 0;">`;
-    html += `<div style="font-size:18px; font-weight:bold;">ポット: ${state.pot}</div>`;
-    if (currentBets > 0) {
-        html += `<div style="font-size:14px; color:#aaa;">（現在のベット: ${currentBets}）</div>`;
-        html += `<div style="font-size:14px; color:#ffff66;">合計: ${totalPot}</div>`;
-    }
-    html += `</div>`;
+    html += `<div style="font-size:16px; font-weight:bold; color:#ffd700;">ポット: ${totalPot}</div>`;
     html += '</div>';
     
-    // プレイヤー情報
-    html += '<div>';
+    // プレイヤー座席
     state.players.forEach((p, i) => {
+        const pos = getPlayerPosition(i, state.players.length);
         const isTurn = i === state.turnIndex;
-        const isDealer = i === state.dealerIndex;
         const isFolded = p.folded;
+        const isMe = p.id === myPlayerId;
         
-        // フォールドしたプレイヤーはグレーアウト
-        let bgColor = '#3a3a3a';
-        if (isFolded) {
-            bgColor = '#1a1a1a';
-        } else if (isTurn) {
-            bgColor = '#0066cc';
+        const sbIndex = (state.dealerIndex + 1) % state.players.length;
+        const bbIndex = (state.dealerIndex + 2) % state.players.length;
+        const isDealer = i === state.dealerIndex;
+        const isSB = i === sbIndex;
+        const isBB = i === bbIndex;
+        
+        let seatClass = 'player-seat';
+        if (isTurn) seatClass += ' active';
+        if (isFolded) seatClass += ' folded';
+        if (isMe) seatClass += ' my-seat';
+        
+        let badges = '';
+        if (isDealer) badges += '<span class="blind-badge" style="background:#ffd700;">D</span>';
+        if (isSB) badges += '<span class="blind-badge">SB</span>';
+        if (isBB) badges += '<span class="blind-badge">BB</span>';
+        
+        html += `<div class="${seatClass}" style="left:${pos.x}%; top:${pos.y}%; transform:translate(-50%, -50%);">`;
+        html += `<div style="font-weight:bold; font-size:13px;">${p.name} ${badges}</div>`;
+        html += `<div style="font-size:11px; color:#aaa;">${p.chips}</div>`;
+        if (p.bet > 0) {
+            html += `<div style="font-size:11px; color:#ffff66;">ベット: ${p.bet}</div>`;
         }
-        
-        const opacity = isFolded ? 'opacity:0.5;' : '';
-        
-        // 最後のアクションを表示
-        let actionTag = '';
-        if (p.lastAction) {
-            const actionColors = {
-                'fold': '#ff6666',
-                'check': '#66ff66',
-                'call': '#ffff66',
-                'bet': '#ff9966',
-                'raise': '#ff9966',
-                'allin': '#ff0000'
-            };
-            const actionLabels = {
-                'fold': 'フォールド',
-                'check': 'チェック',
-                'call': 'コール',
-                'bet': 'ベット',
-                'raise': 'レイズ',
-                'allin': 'オールイン'
-            };
-            const color = actionColors[p.lastAction] || '#aaa';
-            const label = actionLabels[p.lastAction] || p.lastAction;
-            actionTag = `<span style="background:${color}; color:#000; padding:2px 8px; border-radius:4px; font-size:12px; font-weight:bold; margin-left:5px;">${label}</span>`;
-        }
-        
-        html += `<div style="background:${bgColor}; padding:10px; margin:5px 0; border-radius:8px; ${opacity} border:${isFolded ? '2px solid #555' : 'none'};">`;
-        html += `<div><strong>${p.name}</strong> ${isDealer ? '(D)' : ''} ${actionTag}</div>`;
-        html += `<div>チップ: ${p.chips} | ベット: ${p.bet}</div>`;
-        
-        // 手札表示（自分のみ）
-        if (p.id === myPlayerId && p.hand && p.hand.length > 0) {
-            html += '<div style="margin:10px 0;">';
-            p.hand.forEach(card => {
-                html += renderCard(card);
-            });
-            html += '</div>';
-            
-            // アクションボタン
-            if (isTurn && !p.folded) {
-                html += '<div style="margin-top:10px;">';
-                html += `<button onclick="sendAction('fold')" style="width:48%; margin:2px;">フォールド</button>`;
-                
-                if (state.currentBet === 0 || state.currentBet === p.bet) {
-                    // チェックできる
-                    html += `<button onclick="sendAction('check')" style="width:48%; margin:2px;">チェック</button>`;
-                } else {
-                    // コールが必要
-                    const callAmount = state.currentBet - p.bet;
-                    html += `<button onclick="sendAction('call')" style="width:48%; margin:2px;">コール(${callAmount})</button>`;
-                }
-                
-                // ベット/レイズ - プリセットボタン + スライダー
-                const minTotalBet = state.currentBet === 0 ? state.bb : state.currentBet * 2;
-                const maxTotalBet = p.bet + p.chips;
-                
-                if (minTotalBet <= maxTotalBet) {
-                    const label = state.currentBet === 0 ? 'ベット' : 'レイズ';
-                    
-                    // スライダー
-                    html += `<div style="margin:10px 0;">`;
-                    html += `<input type="range" id="raise-slider-${i}" min="${minTotalBet}" max="${maxTotalBet}" value="${minTotalBet}" step="${state.bb}" style="width:100%;" oninput="updateRaiseDisplay(${i})">`;
-                    html += `<div style="text-align:center; font-size:18px; font-weight:bold; margin:5px 0;">`;
-                    html += `<span id="raise-display-${i}">${minTotalBet}</span> チップ`;
-                    html += `</div>`;
-                    html += `<button onclick="sendSliderRaise(${i})" style="width:100%; margin:2px; background:#ff9966; font-size:16px; padding:12px;">${label}</button>`;
-                    html += `</div>`;
-                    
-                    // プリセットボタン
-                    html += `<div style="display:flex; gap:5px; margin:5px 0;">`;
-                    html += `<button onclick="setRaiseAmount(${i}, ${minTotalBet})" style="flex:1; padding:8px; font-size:12px;">ミニマム</button>`;
-                    
-                    const potRaise = state.pot + state.currentBet;
-                    if (potRaise > minTotalBet && potRaise <= maxTotalBet) {
-                        html += `<button onclick="setRaiseAmount(${i}, ${potRaise})" style="flex:1; padding:8px; font-size:12px;">ポット</button>`;
-                    }
-                    
-                    if (maxTotalBet > minTotalBet) {
-                        html += `<button onclick="setRaiseAmount(${i}, ${maxTotalBet})" style="flex:1; padding:8px; font-size:12px; background:#cc0000;">オールイン</button>`;
-                    }
-                    html += `</div>`;
-                }
-                
-                html += '</div>';
-            }
-        }
-        
         html += '</div>';
     });
+    
     html += '</div>';
+    
+    // 自分の手札とアクション
+    const myPlayer = state.players.find(p => p.id === myPlayerId);
+    if (myPlayer && myPlayer.hand && myPlayer.hand.length > 0) {
+        html += '<div id="my-hand">';
+        html += '<div style="margin:10px 0;">';
+        myPlayer.hand.forEach(card => {
+            html += renderCard(card);
+        });
+        html += '</div>';
+        html += '</div>';
+        
+        const myIndex = state.players.findIndex(p => p.id === myPlayerId);
+        const isTurn = myIndex === state.turnIndex;
+        
+        if (isTurn && !myPlayer.folded) {
+            html += '<div id="action-buttons">';
+            html += `<button onclick="sendAction('fold')" style="width:48%; margin:2px;">フォールド</button>`;
+            
+            if (state.currentBet === 0 || state.currentBet === myPlayer.bet) {
+                html += `<button onclick="sendAction('check')" style="width:48%; margin:2px;">チェック</button>`;
+            } else {
+                const callAmount = state.currentBet - myPlayer.bet;
+                html += `<button onclick="sendAction('call')" style="width:48%; margin:2px;">コール(${callAmount})</button>`;
+            }
+            
+            const minTotalBet = state.currentBet === 0 ? state.bb : state.currentBet * 2;
+            const maxTotalBet = myPlayer.bet + myPlayer.chips;
+            
+            if (minTotalBet <= maxTotalBet) {
+                const label = state.currentBet === 0 ? 'ベット' : 'レイズ';
+                
+                html += `<div style="margin:10px 0;">`;
+                html += `<input type="range" id="raise-slider" min="${minTotalBet}" max="${maxTotalBet}" value="${minTotalBet}" step="${state.bb}" style="width:100%;" oninput="updateRaiseDisplay()">`;
+                html += `<div style="text-align:center; font-size:18px; font-weight:bold; margin:5px 0;">`;
+                html += `<span id="raise-display">${minTotalBet}</span> チップ`;
+                html += `</div>`;
+                html += `<button onclick="sendSliderRaise()" style="width:100%; margin:2px; background:#ff9966; font-size:16px; padding:12px;">${label}</button>`;
+                html += `</div>`;
+                
+                html += `<div style="display:flex; gap:5px; margin:5px 0;">`;
+                html += `<button onclick="setRaiseAmount(${minTotalBet})" style="flex:1; padding:8px; font-size:12px;">ミニマム</button>`;
+                
+                const potRaise = state.pot + state.currentBet;
+                if (potRaise > minTotalBet && potRaise <= maxTotalBet) {
+                    html += `<button onclick="setRaiseAmount(${potRaise})" style="flex:1; padding:8px; font-size:12px;">ポット</button>`;
+                }
+                
+                if (maxTotalBet > minTotalBet) {
+                    html += `<button onclick="setRaiseAmount(${maxTotalBet})" style="flex:1; padding:8px; font-size:12px; background:#cc0000;">オールイン</button>`;
+                }
+                html += `</div>`;
+            }
+            
+            html += '</div>';
+        }
+    }
     
     gameArea.innerHTML = html;
 }
@@ -572,25 +562,25 @@ window.sendAction = function(action, amount) {
     }
 };
 
-window.updateRaiseDisplay = function(playerIndex) {
-    const slider = document.getElementById(`raise-slider-${playerIndex}`);
-    const display = document.getElementById(`raise-display-${playerIndex}`);
+window.updateRaiseDisplay = function() {
+    const slider = document.getElementById('raise-slider');
+    const display = document.getElementById('raise-display');
     if (slider && display) {
         display.textContent = slider.value;
     }
 };
 
-window.setRaiseAmount = function(playerIndex, amount) {
-    const slider = document.getElementById(`raise-slider-${playerIndex}`);
-    const display = document.getElementById(`raise-display-${playerIndex}`);
+window.setRaiseAmount = function(amount) {
+    const slider = document.getElementById('raise-slider');
+    const display = document.getElementById('raise-display');
     if (slider && display) {
         slider.value = amount;
         display.textContent = amount;
     }
 };
 
-window.sendSliderRaise = function(playerIndex) {
-    const slider = document.getElementById(`raise-slider-${playerIndex}`);
+window.sendSliderRaise = function() {
+    const slider = document.getElementById('raise-slider');
     if (!slider) return;
     
     const amount = parseInt(slider.value);

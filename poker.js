@@ -81,9 +81,10 @@ export class PokerGame {
         
         // オールインかどうか判定
         const isAllIn = player.chips === 0;
-        player.lastAction = isAllIn ? 'allin' : (player.bet > this.currentBet ? 'raise' : 'bet');
         
         if (player.bet > this.currentBet) {
+            // レイズ成功
+            player.lastAction = isAllIn ? 'allin' : 'raise';
             this.currentBet = player.bet;
             this.lastRaiserIndex = playerIndex;
             // レイズされたら他のプレイヤーのactedをリセット（オールインは除く）
@@ -92,6 +93,9 @@ export class PokerGame {
                     p.acted = false;
                 }
             });
+        } else {
+            // オールインだがcurrentBetに届かない場合
+            player.lastAction = 'allin';
         }
         
         this.nextTurn();
@@ -105,7 +109,10 @@ export class PokerGame {
         player.chips -= toCall;
         player.bet += toCall;
         player.acted = true;
-        player.lastAction = 'call';
+        
+        // オールインかどうか判定
+        const isAllIn = player.chips === 0;
+        player.lastAction = isAllIn ? 'allin' : 'call';
         
         this.nextTurn();
     }
@@ -147,7 +154,7 @@ export class PokerGame {
     nextTurn() {
         const activePlayers = this.players.filter(p => !p.folded);
         
-        // オールインしているプレイヤーを除外してアクション可能なプレイヤーを取得
+        // アクション可能なプレイヤー（チップが残っている）
         const playersCanAct = activePlayers.filter(p => p.chips > 0);
         
         // アクション可能なプレイヤーが1人以下ならフェーズ進行
@@ -156,11 +163,14 @@ export class PokerGame {
             return;
         }
         
-        // アクション可能なプレイヤー全員がアクション済みかつベット額が揃っているかチェック
+        // ベットラウンド終了判定
+        // 全員がアクション済み かつ ベット額が揃っている（オールインは除く）
         const allActed = playersCanAct.every(p => p.acted);
-        const allBetsEqual = playersCanAct.every(p => p.bet === this.currentBet);
+        const allBetsMatched = playersCanAct.every(p => 
+            p.bet === this.currentBet || p.chips === 0
+        );
         
-        if (allActed && allBetsEqual) {
+        if (allActed && allBetsMatched) {
             this.nextPhase();
             return;
         }
