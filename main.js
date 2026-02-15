@@ -323,9 +323,16 @@ function renderGame(state) {
 }
 
 window.sendAction = function(action, amount) {
-    console.log('sendAction:', action, amount, 'myPlayerId:', myPlayerId);
+    console.log('sendAction:', action, amount, 'myPlayerId:', myPlayerId, 'isHost:', isHost);
     const amountNum = amount ? parseInt(amount) : 0;
-    rtc.send({ type: 'action', playerId: myPlayerId, action, amount: amountNum });
+    
+    if (isHost) {
+        // ホストは直接処理してブロードキャスト
+        handlePlayerAction({ playerId: myPlayerId, action, amount: amountNum });
+    } else {
+        // クライアントはホストに送信
+        rtc.send({ type: 'action', playerId: myPlayerId, action, amount: amountNum });
+    }
 };
 
 window.showRaiseInput = function(minAmount, maxAmount) {
