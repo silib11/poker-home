@@ -69,21 +69,15 @@ input {
     font-size: 16px;
 }
 
-#qr-section {
-    margin: 20px 0;
-    text-align: center;
-}
-
-#qr-code {
-    background: #fff;
-    padding: 20px;
+#room-info {
+    background: #2a2a2a;
+    padding: 15px;
     border-radius: 8px;
-    display: inline-block;
     margin: 10px 0;
 }
 
 #room-url {
-    background: #2a2a2a;
+    background: #333;
     padding: 10px;
     border-radius: 8px;
     word-break: break-all;

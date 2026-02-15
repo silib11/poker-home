@@ -13,7 +13,7 @@
             <h1>ポーカー</h1>
             
             <div id="host-section">
-                <h2>ホスト（観戦専用）</h2>
+                <h2>ルーム作成</h2>
                 <label>バイイン（初期チップ）</label>
                 <input type="number" id="buyin-input" value="1000" min="100" step="100">
                 
@@ -24,14 +24,15 @@
                 <input type="number" id="bb-input" value="20" min="10" step="10">
                 
                 <button id="create-room">ルーム作成</button>
-                <div id="qr-section" style="display:none;">
-                    <div id="qr-code"></div>
+                <div id="room-info" style="display:none;">
                     <div id="room-url"></div>
+                    <input type="text" id="host-name" placeholder="名前（ホストも参加する場合）" maxlength="10">
+                    <button id="host-join">参加</button>
                 </div>
             </div>
             
             <div id="join-section">
-                <h2>プレイヤー参加</h2>
+                <h2>参加</h2>
                 <input type="text" id="player-name" placeholder="名前" maxlength="10">
                 <button id="join-room">参加</button>
             </div>

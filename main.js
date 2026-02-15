@@ -1,18 +1,18 @@
 import { WebRTCManager } from './webrtc.js';
 import { PokerGame } from './poker.js';
-import QRCode from 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/+esm';
 
 const setupScreen = document.getElementById('setup-screen');
 const gameScreen = document.getElementById('game-screen');
 const status = document.getElementById('status');
 const createBtn = document.getElementById('create-room');
 const joinBtn = document.getElementById('join-room');
+const hostJoinBtn = document.getElementById('host-join');
 const playerNameInput = document.getElementById('player-name');
+const hostNameInput = document.getElementById('host-name');
 const buyinInput = document.getElementById('buyin-input');
 const sbInput = document.getElementById('sb-input');
 const bbInput = document.getElementById('bb-input');
-const qrSection = document.getElementById('qr-section');
-const qrCode = document.getElementById('qr-code');
+const roomInfo = document.getElementById('room-info');
 const roomUrl = document.getElementById('room-url');
 const hostControls = document.getElementById('host-controls');
 const sbControl = document.getElementById('sb-control');
@@ -60,28 +60,38 @@ createBtn.addEventListener('click', async () => {
     const roomId = await rtc.createRoom();
     const url = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
     
-    // QRコード生成
-    const canvas = document.createElement('canvas');
-    try {
-        await QRCode.toCanvas(canvas, url, { width: 200 });
-        qrCode.innerHTML = '';
-        qrCode.appendChild(canvas);
-    } catch (err) {
-        console.error('QR生成エラー:', err);
-        qrCode.textContent = 'QR生成失敗';
+    roomUrl.textContent = `ルームURL: ${url}`;
+    roomInfo.style.display = 'block';
+    createBtn.disabled = true;
+    
+    status.textContent = 'ルーム作成完了';
+});
+
+hostJoinBtn.addEventListener('click', () => {
+    const name = hostNameInput.value.trim();
+    if (!name) {
+        alert('名前を入力してください');
+        return;
     }
     
-    roomUrl.textContent = url;
-    qrSection.style.display = 'block';
+    myPlayerId = Date.now().toString();
+    gameState.players.push({
+        id: myPlayerId,
+        name: name,
+        chips: gameState.buyin
+    });
+    
+    updatePlayersList();
+    rtc.broadcast({ type: 'state', state: gameState });
     
     setupScreen.style.display = 'none';
     gameScreen.style.display = 'block';
     hostControls.style.display = 'block';
     
-    sbControl.value = sb;
-    bbControl.value = bb;
+    sbControl.value = gameState.sb;
+    bbControl.value = gameState.bb;
     
-    updatePlayersList();
+    status.textContent = `参加完了: ${gameState.players.length}人`;
 });
 
 joinBtn.addEventListener('click', async () => {
