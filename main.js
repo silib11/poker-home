@@ -395,7 +395,17 @@ function renderGame(state) {
         html += renderCard(card);
     });
     html += '</div>';
-    html += `<div style="margin:10px 0;">ポット: ${state.pot}</div>`;
+    
+    // ポット表示（現在のベット総額も含む）
+    const currentBets = state.players.reduce((sum, p) => sum + p.bet, 0);
+    const totalPot = state.pot + currentBets;
+    html += `<div style="margin:10px 0;">`;
+    html += `<div style="font-size:18px; font-weight:bold;">ポット: ${state.pot}</div>`;
+    if (currentBets > 0) {
+        html += `<div style="font-size:14px; color:#aaa;">（現在のベット: ${currentBets}）</div>`;
+        html += `<div style="font-size:14px; color:#ffff66;">合計: ${totalPot}</div>`;
+    }
+    html += `</div>`;
     html += '</div>';
     
     // プレイヤー情報

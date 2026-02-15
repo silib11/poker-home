@@ -53,12 +53,10 @@ export class PokerGame {
         this.players[sbIndex].chips -= this.sb;
         this.players[sbIndex].bet = this.sb;
         this.players[sbIndex].acted = false;
-        this.pot += this.sb;
         
         this.players[bbIndex].chips -= this.bb;
         this.players[bbIndex].bet = this.bb;
         this.players[bbIndex].acted = false;
-        this.pot += this.bb;
         
         this.currentBet = this.bb;
         this.lastRaiserIndex = -1;
@@ -85,8 +83,6 @@ export class PokerGame {
         const isAllIn = player.chips === 0;
         player.lastAction = isAllIn ? 'allin' : (player.bet > this.currentBet ? 'raise' : 'bet');
         
-        this.pot += totalBet;
-        
         if (player.bet > this.currentBet) {
             this.currentBet = player.bet;
             this.lastRaiserIndex = playerIndex;
@@ -110,7 +106,6 @@ export class PokerGame {
         player.bet += toCall;
         player.acted = true;
         player.lastAction = 'call';
-        this.pot += toCall;
         
         this.nextTurn();
     }
@@ -125,6 +120,12 @@ export class PokerGame {
         const activePlayers = this.players.filter(p => !p.folded);
         if (activePlayers.length === 1) {
             this.phase = 'WINNER';
+            
+            // 全プレイヤーのベットをポットに移動
+            this.players.forEach(p => {
+                this.pot += p.bet;
+            });
+            
             const winAmount = this.pot;
             activePlayers[0].chips += winAmount;
             this.winner = activePlayers[0];
@@ -182,8 +183,9 @@ export class PokerGame {
 
     // 次のフェーズ
     nextPhase() {
-        // ベットリセット
+        // 全プレイヤーのベットをポットに移動
         this.players.forEach(p => {
+            this.pot += p.bet;
             p.bet = 0;
             p.acted = false;
             p.lastAction = null;
