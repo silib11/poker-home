@@ -24,6 +24,7 @@ let rtc;
 let isHost = false;
 let game = null;
 let myPlayerId = null;
+let myPlayerName = null;
 let currentRoomId = null;
 let gameState = {
     players: [],
@@ -39,6 +40,7 @@ createBtn.addEventListener('click', async () => {
         return;
     }
     
+    myPlayerName = hostName;
     isHost = true;
     const buyin = parseInt(buyinInput.value);
     const sb = parseInt(sbInput.value);
@@ -99,6 +101,7 @@ joinBtn.addEventListener('click', async () => {
         return;
     }
     
+    myPlayerName = name;
     currentRoomId = roomId;
     status.textContent = '接続中...';
     rtc = new WebRTCManager(false);
@@ -162,8 +165,9 @@ function handleMessage(msg) {
         status.textContent = `プレイヤー: ${gameState.players.length}人`;
     }
     
-    if (data.type === 'player_id' && data.name === playerNameInput.value) {
+    if (data.type === 'player_id' && data.name === myPlayerName) {
         myPlayerId = data.playerId;
+        console.log('自分のプレイヤーID設定:', myPlayerId);
     }
     
     if (data.type === 'state') {
@@ -203,8 +207,16 @@ function updatePlayersList() {
 }
 
 function handlePlayerAction(data) {
+    console.log('handlePlayerAction:', data);
     const playerIndex = game.players.findIndex(p => p.id === data.playerId);
-    if (playerIndex === -1) return;
+    console.log('playerIndex:', playerIndex, 'game.players:', game.players.map(p => p.id));
+    
+    if (playerIndex === -1) {
+        console.error('プレイヤーが見つかりません:', data.playerId);
+        return;
+    }
+    
+    console.log('アクション実行:', data.action);
     
     if (data.action === 'fold') {
         game.fold(playerIndex);
@@ -217,6 +229,7 @@ function handlePlayerAction(data) {
     }
     
     const newState = game.getState();
+    console.log('新しい状態:', newState.phase, 'ターン:', newState.turnIndex);
     rtc.broadcast({ type: 'game_update', state: newState });
     renderGame(newState);
     status.textContent = `${newState.phase} - ポット: ${newState.pot}`;
@@ -290,6 +303,7 @@ function renderGame(state) {
 }
 
 window.sendAction = function(action, amount) {
+    console.log('sendAction:', action, amount, 'myPlayerId:', myPlayerId);
     rtc.send({ type: 'action', playerId: myPlayerId, action, amount });
 };
 
