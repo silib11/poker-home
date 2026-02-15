@@ -51,16 +51,16 @@ export class PokerGame {
         
         this.players[sbIndex].chips -= this.sb;
         this.players[sbIndex].bet = this.sb;
-        this.players[sbIndex].acted = true;
+        this.players[sbIndex].acted = false;
         this.pot += this.sb;
         
         this.players[bbIndex].chips -= this.bb;
         this.players[bbIndex].bet = this.bb;
-        this.players[bbIndex].acted = true;
+        this.players[bbIndex].acted = false;
         this.pot += this.bb;
         
         this.currentBet = this.bb;
-        this.lastRaiserIndex = bbIndex;
+        this.lastRaiserIndex = -1;
         this.turnIndex = (bbIndex + 1) % this.players.length;
         
         // 手札配布
@@ -113,11 +113,12 @@ export class PokerGame {
         this.players[playerIndex].folded = true;
         this.players[playerIndex].acted = true;
         
-        // 1人だけ残ったら即終了
+        // 1人だけ残ったら即終了（手札公開なし）
         const activePlayers = this.players.filter(p => !p.folded);
         if (activePlayers.length === 1) {
-            this.phase = 'SHOWDOWN';
-            this.determineWinner();
+            this.phase = 'WINNER';
+            activePlayers[0].chips += this.pot;
+            this.winner = activePlayers[0];
             return;
         }
         
@@ -202,13 +203,95 @@ export class PokerGame {
         return winner;
     }
 
-    // 役判定（簡易版：ハイカードのみ）
+    // 役判定（正式版）
     evaluateHand(hand) {
         const allCards = [...hand, ...this.community];
         const rankValues = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14 };
         
-        // とりあえず最高カードの値を返す
-        return Math.max(...allCards.map(c => rankValues[c.rank]));
+        // カードをランクと数値に変換
+        const cards = allCards.map(c => ({ rank: c.rank, suit: c.suit, value: rankValues[c.rank] }));
+        cards.sort((a, b) => b.value - a.value);
+        
+        // ランクごとの枚数をカウント
+        const rankCounts = {};
+        cards.forEach(c => {
+            rankCounts[c.value] = (rankCounts[c.value] || 0) + 1;
+        });
+        
+        const counts = Object.entries(rankCounts).map(([rank, count]) => ({ rank: parseInt(rank), count }));
+        counts.sort((a, b) => b.count - a.count || b.rank - a.rank);
+        
+        // スートごとの枚数をカウント
+        const suitCounts = {};
+        cards.forEach(c => {
+            suitCounts[c.suit] = (suitCounts[c.suit] || 0) + 1;
+        });
+        
+        const isFlush = Object.values(suitCounts).some(count => count >= 5);
+        
+        // ストレート判定
+        const uniqueValues = [...new Set(cards.map(c => c.value))].sort((a, b) => b - a);
+        let isStraight = false;
+        let straightHigh = 0;
+        
+        for (let i = 0; i <= uniqueValues.length - 5; i++) {
+            if (uniqueValues[i] - uniqueValues[i + 4] === 4) {
+                isStraight = true;
+                straightHigh = uniqueValues[i];
+                break;
+            }
+        }
+        
+        // A-2-3-4-5のストレート（ホイール）
+        if (!isStraight && uniqueValues.includes(14) && uniqueValues.includes(5) && 
+            uniqueValues.includes(4) && uniqueValues.includes(3) && uniqueValues.includes(2)) {
+            isStraight = true;
+            straightHigh = 5;
+        }
+        
+        // 役の判定
+        // ストレートフラッシュ
+        if (isFlush && isStraight) {
+            return 8000000 + straightHigh;
+        }
+        
+        // フォーカード
+        if (counts[0].count === 4) {
+            return 7000000 + counts[0].rank * 1000 + counts[1].rank;
+        }
+        
+        // フルハウス
+        if (counts[0].count === 3 && counts[1].count >= 2) {
+            return 6000000 + counts[0].rank * 1000 + counts[1].rank;
+        }
+        
+        // フラッシュ
+        if (isFlush) {
+            return 5000000 + cards[0].value * 10000 + cards[1].value * 100 + cards[2].value;
+        }
+        
+        // ストレート
+        if (isStraight) {
+            return 4000000 + straightHigh;
+        }
+        
+        // スリーカード
+        if (counts[0].count === 3) {
+            return 3000000 + counts[0].rank * 10000 + counts[1].rank * 100 + counts[2].rank;
+        }
+        
+        // ツーペア
+        if (counts[0].count === 2 && counts[1].count === 2) {
+            return 2000000 + counts[0].rank * 10000 + counts[1].rank * 100 + counts[2].rank;
+        }
+        
+        // ワンペア
+        if (counts[0].count === 2) {
+            return 1000000 + counts[0].rank * 10000 + counts[1].rank * 100 + counts[2].rank;
+        }
+        
+        // ハイカード
+        return cards[0].value * 10000 + cards[1].value * 100 + cards[2].value;
     }
 
     // 状態取得
@@ -222,7 +305,8 @@ export class PokerGame {
             turnIndex: this.turnIndex,
             dealerIndex: this.dealerIndex,
             sb: this.sb,
-            bb: this.bb
+            bb: this.bb,
+            winner: this.winner
         };
     }
 

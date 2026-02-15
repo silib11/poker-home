@@ -253,10 +253,35 @@ function renderGame(state) {
         return `<span style="display:inline-block; background:#fff; color:${getCardColor(card.suit)}; padding:8px 12px; margin:0 3px; border-radius:6px; font-size:28px; font-weight:bold; box-shadow:0 2px 4px rgba(0,0,0,0.3);">${card.suit}${card.rank}</span>`;
     };
     
+    // WINNER時の処理（フォールドで勝利、手札非公開）
+    if (state.phase === 'WINNER') {
+        let html = '<div style="text-align:center; margin:20px 0;">';
+        html += '<h2>勝者決定</h2>';
+        html += `<div style="font-size:24px; margin:20px 0;">${state.winner.name} の勝利！</div>`;
+        html += `<div style="font-size:18px; margin:10px 0;">獲得: ${state.pot} チップ</div>`;
+        
+        if (isHost) {
+            html += `<button onclick="nextHand()" style="width:80%; padding:20px; font-size:18px; margin:20px 0;">次のハンド</button>`;
+        }
+        
+        html += '</div>';
+        gameArea.innerHTML = html;
+        return;
+    }
+    
     // SHOWDOWN時の処理
     if (state.phase === 'SHOWDOWN') {
         let html = '<div style="text-align:center; margin:20px 0;">';
         html += '<h2>ショウダウン</h2>';
+        
+        // コミュニティカード表示
+        html += '<h3>ボード</h3>';
+        html += '<div style="margin:15px 0;">';
+        state.community.forEach(card => {
+            html += renderCard(card);
+        });
+        html += '</div>';
+        
         html += `<div style="font-size:20px; margin:20px 0;">ポット: ${state.pot}</div>`;
         
         // 全プレイヤーの手札を表示
