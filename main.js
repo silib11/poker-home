@@ -187,6 +187,15 @@ function handleMessage(msg) {
     }
     
     if (data.type === 'game_update') {
+        // gameStateのプレイヤーチップを更新
+        if (data.state.players) {
+            gameState.players = data.state.players.map(p => ({
+                id: p.id,
+                name: p.name,
+                chips: p.chips
+            }));
+            updatePlayersList();
+        }
         renderGame(data.state);
         status.textContent = `${data.state.phase} - ポット: ${data.state.pot}`;
     }
@@ -242,11 +251,19 @@ function handlePlayerAction(data) {
     const newState = game.getState();
     console.log('新しい状態:', newState.phase, 'ターン:', newState.turnIndex);
     
+    // gameStateのプレイヤーチップを更新
+    gameState.players = newState.players.map(p => ({
+        id: p.id,
+        name: p.name,
+        chips: p.chips
+    }));
+    
     // 全プレイヤーに送信
     rtc.broadcast({ type: 'game_update', state: newState });
     
     // ホスト自身も更新
     renderGame(newState);
+    updatePlayersList();
     status.textContent = `${newState.phase} - ポット: ${newState.pot}`;
 }
 
@@ -344,8 +361,42 @@ function renderGame(state) {
     state.players.forEach((p, i) => {
         const isTurn = i === state.turnIndex;
         const isDealer = i === state.dealerIndex;
-        html += `<div style="background:${isTurn ? '#005a9e' : '#333'}; padding:10px; margin:5px 0; border-radius:8px;">`;
-        html += `<div><strong>${p.name}</strong> ${isDealer ? '(D)' : ''}</div>`;
+        const isFolded = p.folded;
+        
+        // フォールドしたプレイヤーはグレーアウト
+        let bgColor = '#3a3a3a';
+        if (isFolded) {
+            bgColor = '#1a1a1a';
+        } else if (isTurn) {
+            bgColor = '#0066cc';
+        }
+        
+        const opacity = isFolded ? 'opacity:0.5;' : '';
+        
+        // 最後のアクションを表示
+        let actionTag = '';
+        if (p.lastAction) {
+            const actionColors = {
+                'fold': '#ff6666',
+                'check': '#66ff66',
+                'call': '#ffff66',
+                'bet': '#ff9966',
+                'raise': '#ff9966'
+            };
+            const actionLabels = {
+                'fold': 'フォールド',
+                'check': 'チェック',
+                'call': 'コール',
+                'bet': 'ベット',
+                'raise': 'レイズ'
+            };
+            const color = actionColors[p.lastAction] || '#aaa';
+            const label = actionLabels[p.lastAction] || p.lastAction;
+            actionTag = `<span style="background:${color}; color:#000; padding:2px 8px; border-radius:4px; font-size:12px; font-weight:bold; margin-left:5px;">${label}</span>`;
+        }
+        
+        html += `<div style="background:${bgColor}; padding:10px; margin:5px 0; border-radius:8px; ${opacity} border:${isFolded ? '2px solid #555' : 'none'};">`;
+        html += `<div><strong>${p.name}</strong> ${isDealer ? '(D)' : ''} ${actionTag}</div>`;
         html += `<div>チップ: ${p.chips} | ベット: ${p.bet}</div>`;
         
         // 手札表示（自分のみ）
@@ -387,10 +438,6 @@ function renderGame(state) {
                 
                 html += '</div>';
             }
-        }
-        
-        if (p.folded) {
-            html += '<div style="color:#888;">フォールド</div>';
         }
         
         html += '</div>';

@@ -6,7 +6,7 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-    background: #1a1a1a;
+    background: #2a2a2a;
     color: #fff;
     padding: 20px;
     -webkit-user-select: none;
@@ -38,7 +38,7 @@ h3 { font-size: 18px; }
 }
 
 #status {
-    background: #333;
+    background: #3a3a3a;
     padding: 10px;
     border-radius: 8px;
     margin-bottom: 20px;

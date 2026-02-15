@@ -6,7 +6,8 @@ export class PokerGame {
             bet: 0,
             folded: false,
             position: i,
-            acted: false
+            acted: false,
+            lastAction: null
         }));
         this.sb = sb;
         this.bb = bb;
@@ -79,6 +80,7 @@ export class PokerGame {
         player.chips -= totalBet;
         player.bet += totalBet;
         player.acted = true;
+        player.lastAction = player.bet > this.currentBet ? 'raise' : 'bet';
         this.pot += totalBet;
         
         if (player.bet > this.currentBet) {
@@ -103,6 +105,7 @@ export class PokerGame {
         player.chips -= toCall;
         player.bet += toCall;
         player.acted = true;
+        player.lastAction = 'call';
         this.pot += toCall;
         
         this.nextTurn();
@@ -112,6 +115,7 @@ export class PokerGame {
     fold(playerIndex) {
         this.players[playerIndex].folded = true;
         this.players[playerIndex].acted = true;
+        this.players[playerIndex].lastAction = 'fold';
         
         // 1人だけ残ったら即終了（手札公開なし）
         const activePlayers = this.players.filter(p => !p.folded);
@@ -130,6 +134,7 @@ export class PokerGame {
     // チェック
     check(playerIndex) {
         this.players[playerIndex].acted = true;
+        this.players[playerIndex].lastAction = 'check';
         this.nextTurn();
     }
 
@@ -158,6 +163,7 @@ export class PokerGame {
         this.players.forEach(p => {
             p.bet = 0;
             p.acted = false;
+            p.lastAction = null;
         });
         this.currentBet = 0;
         this.lastRaiserIndex = -1;
