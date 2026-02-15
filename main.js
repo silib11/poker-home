@@ -261,7 +261,9 @@ function handleMessage(msg) {
             updatePlayersList();
         }
         renderGame(data.state);
-        status.textContent = `${data.state.phase} - ポット: ${data.state.pot}`;
+        const currentBets = data.state.players.reduce((sum, p) => sum + (p.bet || 0), 0);
+        const totalPot = data.state.pot + currentBets;
+        status.textContent = `${data.state.phase} - ポット: ${totalPot}`;
     }
     
     if (data.type === 'action' && isHost) {
@@ -328,7 +330,9 @@ function handlePlayerAction(data) {
     // ホスト自身も更新
     renderGame(newState);
     updatePlayersList();
-    status.textContent = `${newState.phase} - ポット: ${newState.pot}`;
+    const currentBets = newState.players.reduce((sum, p) => sum + (p.bet || 0), 0);
+    const totalPot = newState.pot + currentBets;
+    status.textContent = `${newState.phase} - ポット: ${totalPot}`;
 }
 
 function renderGame(state) {

@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "test": "node poker.test.js && node ui.test.js",
+    "test": "node poker.test.js && node ui.test.js && node allin.test.js",
     "test:poker": "node poker.test.js",
-    "test:ui": "node ui.test.js"
+    "test:ui": "node ui.test.js",
+    "test:allin": "node allin.test.js"
   }
 }
