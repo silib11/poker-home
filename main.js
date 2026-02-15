@@ -7,6 +7,12 @@ const status = document.getElementById('status');
 const createBtn = document.getElementById('create-room');
 const joinBtn = document.getElementById('join-room');
 const playerNameInput = document.getElementById('player-name');
+const roomIdInput = document.getElementById('room-id-input');
+const buyinInput = document.getElementById('buyin-input');
+const sbInput = document.getElementById('sb-input');
+const bbInput = document.getElementById('bb-input');
+const roomInfo = document.getElementById('room-info');
+const roomIdDisplay = document.getElementById('room-id-display');
 const hostControls = document.getElementById('host-controls');
 const sbControl = document.getElementById('sb-control');
 const bbControl = document.getElementById('bb-control');
@@ -14,12 +20,11 @@ const updateBlindsBtn = document.getElementById('update-blinds');
 const startGameBtn = document.getElementById('start-game');
 const playersList = document.getElementById('players-list');
 
-let hostJoinBtn, hostNameInput, buyinInput, sbInput, bbInput, roomInfo, roomUrl, copyUrlBtn, currentRoomUrl;
-
 let rtc;
 let isHost = false;
 let game = null;
 let myPlayerId = null;
+let currentRoomId = null;
 let gameState = {
     players: [],
     buyin: 1000,
@@ -27,26 +32,7 @@ let gameState = {
     bb: 20
 };
 
-// URLパラメータからルームID取得
-const urlParams = new URLSearchParams(window.location.search);
-const roomIdFromUrl = urlParams.get('room');
-
-if (roomIdFromUrl) {
-    document.getElementById('host-section').style.display = 'none';
-}
-
-// ホスト用要素を取得（存在する場合のみ）
-hostJoinBtn = document.getElementById('host-join');
-hostNameInput = document.getElementById('host-name');
-buyinInput = document.getElementById('buyin-input');
-sbInput = document.getElementById('sb-input');
-bbInput = document.getElementById('bb-input');
-roomInfo = document.getElementById('room-info');
-roomUrl = document.getElementById('room-url');
-copyUrlBtn = document.getElementById('copy-url');
-
-if (createBtn) {
-    createBtn.addEventListener('click', async () => {
+createBtn.addEventListener('click', async () => {
     isHost = true;
     const buyin = parseInt(buyinInput.value);
     const sb = parseInt(sbInput.value);
@@ -61,73 +47,28 @@ if (createBtn) {
     
     rtc.onStatusChange = (s) => status.textContent = s;
     rtc.onMessage = handleMessage;
-    rtc.onConnected = () => status.textContent = `接続: ${gameState.players.length}人`;
+    rtc.onConnected = () => {
+        status.textContent = `接続: ${gameState.players.length}人`;
+    };
     
-    const roomId = await rtc.createRoom();
-    const url = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
-    
-    currentRoomUrl = url;
-    roomUrl.textContent = `ルームID: ${roomId}`;
+    currentRoomId = await rtc.createRoom();
+    roomIdDisplay.textContent = `ルームID: ${currentRoomId}`;
     roomInfo.style.display = 'block';
-    createBtn.disabled = true;
     
-    status.textContent = 'ルーム作成完了';
+    status.textContent = 'ルーム作成完了 - プレイヤー待機中';
 });
-}
-
-if (copyUrlBtn) {
-    copyUrlBtn.addEventListener('click', async () => {
-        try {
-            await navigator.clipboard.writeText(currentRoomUrl);
-            copyUrlBtn.textContent = 'コピー完了！';
-            setTimeout(() => {
-                copyUrlBtn.textContent = 'URLをコピー';
-            }, 2000);
-        } catch (err) {
-            alert('コピーに失敗しました: ' + currentRoomUrl);
-        }
-    });
-}
-
-if (hostJoinBtn) {
-    hostJoinBtn.addEventListener('click', () => {
-    const name = hostNameInput.value.trim();
-    if (!name) {
-        alert('名前を入力してください');
-        return;
-    }
-    
-    myPlayerId = Date.now().toString();
-    gameState.players.push({
-        id: myPlayerId,
-        name: name,
-        chips: gameState.buyin
-    });
-    
-    updatePlayersList();
-    rtc.broadcast({ type: 'state', state: gameState });
-    
-    setupScreen.style.display = 'none';
-    gameScreen.style.display = 'block';
-    hostControls.style.display = 'block';
-    
-    sbControl.value = gameState.sb;
-    bbControl.value = gameState.bb;
-    
-    status.textContent = `参加完了: ${gameState.players.length}人`;
-});
-}
 
 joinBtn.addEventListener('click', async () => {
     const name = playerNameInput.value.trim();
+    const roomId = roomIdInput.value.trim();
+    
     if (!name) {
         alert('名前を入力してください');
         return;
     }
     
-    const roomId = roomIdFromUrl;
     if (!roomId) {
-        alert('ルームIDが見つかりません');
+        alert('ルームIDを入力してください');
         return;
     }
     
@@ -160,11 +101,19 @@ startGameBtn.addEventListener('click', () => {
         return;
     }
     
+    setupScreen.style.display = 'none';
+    gameScreen.style.display = 'block';
+    hostControls.style.display = 'block';
+    
+    sbControl.value = gameState.sb;
+    bbControl.value = gameState.bb;
+    
     game = new PokerGame(gameState.players, gameState.sb, gameState.bb);
     game.start();
     
-    rtc.broadcast({ type: 'game_start', state: game.getState() });
-    renderGame(game.getState());
+    const state = game.getState();
+    rtc.broadcast({ type: 'game_start', state });
+    renderGame(state);
     status.textContent = `ゲーム開始 - ${game.phase}`;
 });
 
@@ -180,10 +129,11 @@ function handleMessage(msg) {
         });
         updatePlayersList();
         rtc.broadcast({ type: 'state', state: gameState });
-        rtc.broadcast({ type: 'player_id', playerId, to: data.name });
+        rtc.broadcast({ type: 'player_id', playerId, name: data.name });
+        status.textContent = `プレイヤー: ${gameState.players.length}人`;
     }
     
-    if (data.type === 'player_id' && data.to === playerNameInput.value) {
+    if (data.type === 'player_id' && data.name === playerNameInput.value) {
         myPlayerId = data.playerId;
     }
     
@@ -311,12 +261,6 @@ function renderGame(state) {
 }
 
 window.sendAction = function(action, amount) {
-    if (isHost) {
-        // ホストは直接処理
-        handlePlayerAction({ playerId: myPlayerId, action, amount });
-    } else {
-        // プレイヤーはホストに送信
-        rtc.send({ type: 'action', playerId: myPlayerId, action, amount });
-    }
+    rtc.send({ type: 'action', playerId: myPlayerId, action, amount });
 };
 
