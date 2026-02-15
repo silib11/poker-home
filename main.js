@@ -256,9 +256,10 @@ function renderGame(state) {
     // WINNER時の処理（フォールドで勝利、手札非公開）
     if (state.phase === 'WINNER') {
         let html = '<div style="text-align:center; margin:20px 0;">';
-        html += '<h2>勝者決定</h2>';
-        html += `<div style="font-size:24px; margin:20px 0;">${state.winner.name} の勝利！</div>`;
-        html += `<div style="font-size:18px; margin:10px 0;">獲得: ${state.pot} チップ</div>`;
+        html += '<h2>🏆 勝者決定 🏆</h2>';
+        html += `<div style="font-size:28px; font-weight:bold; color:#ffd700; margin:20px 0;">${state.winner.name}</div>`;
+        html += `<div style="font-size:20px; margin:10px 0;">獲得: <span style="color:#00ff00; font-weight:bold;">+${state.winAmount}</span> チップ</div>`;
+        html += `<div style="font-size:16px; color:#888; margin:10px 0;">現在のチップ: ${state.winner.chips}</div>`;
         
         if (isHost) {
             html += `<button onclick="nextHand()" style="width:80%; padding:20px; font-size:18px; margin:20px 0;">次のハンド</button>`;
@@ -272,7 +273,16 @@ function renderGame(state) {
     // SHOWDOWN時の処理
     if (state.phase === 'SHOWDOWN') {
         let html = '<div style="text-align:center; margin:20px 0;">';
-        html += '<h2>ショウダウン</h2>';
+        html += '<h2>🏆 ショウダウン 🏆</h2>';
+        
+        // 勝者情報
+        if (state.winner) {
+            html += `<div style="background:#1a4d1a; padding:15px; margin:15px 0; border-radius:8px; border:2px solid #ffd700;">`;
+            html += `<div style="font-size:24px; font-weight:bold; color:#ffd700;">勝者: ${state.winner.name}</div>`;
+            html += `<div style="font-size:18px; margin:5px 0;">${state.winningHand || ''}</div>`;
+            html += `<div style="font-size:20px; margin:10px 0;">獲得: <span style="color:#00ff00; font-weight:bold;">+${state.winAmount}</span> チップ</div>`;
+            html += `</div>`;
+        }
         
         // コミュニティカード表示
         html += '<h3>ボード</h3>';
@@ -282,13 +292,12 @@ function renderGame(state) {
         });
         html += '</div>';
         
-        html += `<div style="font-size:20px; margin:20px 0;">ポット: ${state.pot}</div>`;
-        
         // 全プレイヤーの手札を表示
         state.players.forEach(p => {
             if (!p.folded) {
-                html += `<div style="background:#333; padding:15px; margin:10px 0; border-radius:8px;">`;
-                html += `<div style="font-size:18px; font-weight:bold;">${p.name}</div>`;
+                const isWinner = state.winner && p.id === state.winner.id;
+                html += `<div style="background:${isWinner ? '#1a4d1a' : '#333'}; padding:15px; margin:10px 0; border-radius:8px; border:${isWinner ? '2px solid #ffd700' : 'none'};">`;
+                html += `<div style="font-size:18px; font-weight:bold;">${p.name} ${isWinner ? '👑' : ''}</div>`;
                 html += '<div style="margin:10px 0;">';
                 if (p.hand && p.hand.length > 0) {
                     p.hand.forEach(card => html += renderCard(card));
@@ -351,14 +360,17 @@ function renderGame(state) {
                 }
                 
                 // ベット/レイズ
-                const minRaise = state.currentBet === 0 ? state.bb : state.currentBet * 2;
-                const raiseAmount = Math.min(minRaise, p.chips);
-                if (raiseAmount > 0) {
+                // 最小レイズ額 = 現在のベット額の2倍（自分のベット額を含む）
+                const minRaise = state.currentBet === 0 ? state.bb : state.currentBet * 2 - p.bet;
+                const maxRaise = p.chips;
+                
+                if (minRaise > 0 && minRaise <= maxRaise) {
                     const label = state.currentBet === 0 ? 'ベット' : 'レイズ';
-                    html += `<button onclick="showRaiseInput(${raiseAmount}, ${p.chips})" style="width:98%; margin:2px;">${label}(${raiseAmount})</button>`;
+                    const displayAmount = state.currentBet === 0 ? minRaise : minRaise + p.bet;
+                    html += `<button onclick="showRaiseInput(${i}, ${minRaise}, ${maxRaise})" style="width:98%; margin:2px;">${label}(${displayAmount})</button>`;
                     html += `<div id="raise-input-${i}" style="display:none; margin:5px 0;">`;
-                    html += `<input type="number" id="raise-amount-${i}" value="${raiseAmount}" min="${raiseAmount}" max="${p.chips}" step="10" style="width:60%;">`;
-                    html += `<button onclick="sendAction('bet', document.getElementById('raise-amount-${i}').value)" style="width:35%; margin-left:5px;">確定</button>`;
+                    html += `<input type="number" id="raise-amount-${i}" value="${minRaise}" min="${minRaise}" max="${maxRaise}" step="${state.bb}" style="width:60%;">`;
+                    html += `<button onclick="sendRaise(${i}, ${p.bet})" style="width:35%; margin-left:5px;">確定</button>`;
                     html += `</div>`;
                 }
                 
@@ -390,13 +402,30 @@ window.sendAction = function(action, amount) {
     }
 };
 
-window.showRaiseInput = function(minAmount, maxAmount) {
+window.showRaiseInput = function(playerIndex, minAmount, maxAmount) {
     // すべての入力欄を非表示
     document.querySelectorAll('[id^="raise-input-"]').forEach(el => el.style.display = 'none');
     // 該当の入力欄を表示
-    const inputDiv = event.target.nextElementSibling;
+    const inputDiv = document.getElementById(`raise-input-${playerIndex}`);
     if (inputDiv) {
         inputDiv.style.display = 'block';
+    }
+};
+
+window.sendRaise = function(playerIndex, currentBet) {
+    const input = document.getElementById(`raise-amount-${playerIndex}`);
+    if (!input) return;
+    
+    const raiseAmount = parseInt(input.value);
+    // 総ベット額 = 現在のベット + レイズ額
+    const totalBet = currentBet + raiseAmount;
+    
+    console.log('sendRaise: raiseAmount=', raiseAmount, 'currentBet=', currentBet, 'totalBet=', totalBet);
+    
+    if (isHost) {
+        handlePlayerAction({ playerId: myPlayerId, action: 'bet', amount: totalBet });
+    } else {
+        rtc.send({ type: 'action', playerId: myPlayerId, action: 'bet', amount: totalBet });
     }
 };
 

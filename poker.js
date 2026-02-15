@@ -186,21 +186,79 @@ export class PokerGame {
         const activePlayers = this.players.filter(p => !p.folded);
         
         if (activePlayers.length === 1) {
-            activePlayers[0].chips += this.pot;
+            const winAmount = this.pot;
+            activePlayers[0].chips += winAmount;
+            this.winner = activePlayers[0];
+            this.winAmount = winAmount;
             return activePlayers[0];
         }
         
         // 役判定して勝者決定
         const ranked = activePlayers.map(p => ({
             player: p,
-            rank: this.evaluateHand(p.hand)
+            rank: this.evaluateHand(p.hand),
+            handName: this.getHandName(p.hand)
         }));
         
         ranked.sort((a, b) => b.rank - a.rank);
         const winner = ranked[0].player;
-        winner.chips += this.pot;
+        const winAmount = this.pot;
+        winner.chips += winAmount;
+        
+        this.winner = winner;
+        this.winAmount = winAmount;
+        this.winningHand = ranked[0].handName;
         
         return winner;
+    }
+    
+    // 役名を取得
+    getHandName(hand) {
+        const allCards = [...hand, ...this.community];
+        const rankValues = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14 };
+        
+        const cards = allCards.map(c => ({ rank: c.rank, suit: c.suit, value: rankValues[c.rank] }));
+        cards.sort((a, b) => b.value - a.value);
+        
+        const rankCounts = {};
+        cards.forEach(c => {
+            rankCounts[c.value] = (rankCounts[c.value] || 0) + 1;
+        });
+        
+        const counts = Object.entries(rankCounts).map(([rank, count]) => ({ rank: parseInt(rank), count }));
+        counts.sort((a, b) => b.count - a.count || b.rank - a.rank);
+        
+        const suitCounts = {};
+        cards.forEach(c => {
+            suitCounts[c.suit] = (suitCounts[c.suit] || 0) + 1;
+        });
+        
+        const isFlush = Object.values(suitCounts).some(count => count >= 5);
+        
+        const uniqueValues = [...new Set(cards.map(c => c.value))].sort((a, b) => b - a);
+        let isStraight = false;
+        
+        for (let i = 0; i <= uniqueValues.length - 5; i++) {
+            if (uniqueValues[i] - uniqueValues[i + 4] === 4) {
+                isStraight = true;
+                break;
+            }
+        }
+        
+        if (!isStraight && uniqueValues.includes(14) && uniqueValues.includes(5) && 
+            uniqueValues.includes(4) && uniqueValues.includes(3) && uniqueValues.includes(2)) {
+            isStraight = true;
+        }
+        
+        if (isFlush && isStraight) return 'ストレートフラッシュ';
+        if (counts[0].count === 4) return 'フォーカード';
+        if (counts[0].count === 3 && counts[1].count >= 2) return 'フルハウス';
+        if (isFlush) return 'フラッシュ';
+        if (isStraight) return 'ストレート';
+        if (counts[0].count === 3) return 'スリーカード';
+        if (counts[0].count === 2 && counts[1].count === 2) return 'ツーペア';
+        if (counts[0].count === 2) return 'ワンペア';
+        return 'ハイカード';
     }
 
     // 役判定（正式版）
@@ -306,7 +364,9 @@ export class PokerGame {
             dealerIndex: this.dealerIndex,
             sb: this.sb,
             bb: this.bb,
-            winner: this.winner
+            winner: this.winner,
+            winAmount: this.winAmount,
+            winningHand: this.winningHand
         };
     }
 
