@@ -85,7 +85,6 @@ export class WebRTCManager {
             iceCandidatePoolSize: 10
         });
 
-        const iceCandidateQueue = [];
 
         pc.oniceconnectionstatechange = () => {
             debugLog('[Host] ICE state: ' + pc.iceConnectionState);
@@ -104,8 +103,7 @@ export class WebRTCManager {
         pc.onicecandidate = (e) => {
             if (e.candidate) {
                 debugLog('[Host] ICE: ' + e.candidate.type + ' ' + e.candidate.protocol + ' ' + e.candidate.address);
-                const iceRef = ref(db, `rooms/${roomId}/ice/host_${playerId}/${Date.now()}`);
-                set(iceRef, JSON.stringify(e.candidate));
+                // ICE candidates are included in the offer, no need to send separately
             } else {
                 debugLog('[Host] ICE gathering complete');
             }
@@ -138,37 +136,7 @@ export class WebRTCManager {
             if (snapshot.val() && pc.remoteDescription === null) {
                 debugLog('[Host] Received answer from: ' + playerId);
                 await pc.setRemoteDescription(JSON.parse(snapshot.val()));
-                
-                // Process queued candidates
-                debugLog('[Host] Processing ' + iceCandidateQueue.length + ' queued candidates');
-                for (const candidate of iceCandidateQueue) {
-                    try {
-                        await pc.addIceCandidate(candidate);
-                    } catch (e) {
-                        debugLog('ERROR [Host] queued candidate: ' + e);
-                    }
-                }
-                iceCandidateQueue.length = 0;
-            }
-        });
-
-        onValue(ref(db, `rooms/${roomId}/ice/player_${playerId}`), async (snapshot) => {
-            const candidates = snapshot.val();
-            if (candidates) {
-                for (const candidateStr of Object.values(candidates)) {
-                    const candidate = JSON.parse(candidateStr);
-                    debugLog('[Host] Received ICE from player: ' + candidate.type);
-                    if (pc.remoteDescription) {
-                        debugLog('[Host] Adding ICE candidate from player');
-                        try {
-                            await pc.addIceCandidate(candidate);
-                        } catch (e) {
-                            debugLog('ERROR [Host] ICE candidate: ' + e);
-                        }
-                    } else {
-                        iceCandidateQueue.push(candidate);
-                    }
-                }
+                debugLog('[Host] Remote description set, ICE should connect now');
             }
         });
     }
@@ -204,7 +172,6 @@ export class WebRTCManager {
             iceCandidatePoolSize: 10
         });
 
-        const iceCandidateQueue = [];
 
         pc.oniceconnectionstatechange = () => {
             debugLog('[Player] ICE state: ' + pc.iceConnectionState);
@@ -223,8 +190,7 @@ export class WebRTCManager {
         pc.onicecandidate = (e) => {
             if (e.candidate) {
                 debugLog('[Player] ICE: ' + e.candidate.type + ' ' + e.candidate.protocol + ' ' + e.candidate.address);
-                const iceRef = ref(db, `rooms/${roomId}/ice/player_${playerId}/${Date.now()}`);
-                set(iceRef, JSON.stringify(e.candidate));
+                // ICE candidates are included in the answer, no need to send separately
             } else {
                 debugLog('[Player] ICE gathering complete');
             }
@@ -252,37 +218,7 @@ export class WebRTCManager {
                 
                 debugLog('[Player] ICE gathering complete, sending answer');
                 await set(ref(db, `rooms/${roomId}/answers/${playerId}`), JSON.stringify(pc.localDescription));
-                
-                // Process queued candidates
-                debugLog('[Player] Processing ' + iceCandidateQueue.length + ' queued candidates');
-                for (const candidate of iceCandidateQueue) {
-                    try {
-                        await pc.addIceCandidate(candidate);
-                    } catch (e) {
-                        debugLog('ERROR [Player] queued candidate: ' + e);
-                    }
-                }
-                iceCandidateQueue.length = 0;
-            }
-        });
-
-        onValue(ref(db, `rooms/${roomId}/ice/host_${playerId}`), async (snapshot) => {
-            const candidates = snapshot.val();
-            if (candidates) {
-                for (const candidateStr of Object.values(candidates)) {
-                    const candidate = JSON.parse(candidateStr);
-                    debugLog('[Player] Received ICE from host: ' + candidate.type);
-                    if (pc.remoteDescription) {
-                        debugLog('[Player] Adding ICE candidate from host');
-                        try {
-                            await pc.addIceCandidate(candidate);
-                        } catch (e) {
-                            debugLog('ERROR [Player] ICE candidate: ' + e);
-                        }
-                    } else {
-                        iceCandidateQueue.push(candidate);
-                    }
-                }
+                debugLog('[Player] Answer sent, ICE should connect now');
             }
         });
 
