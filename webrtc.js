@@ -74,7 +74,8 @@ export class WebRTCManager {
         pc.onicecandidate = (e) => {
             if (e.candidate) {
                 console.log('[Host] Sending ICE candidate:', e.candidate.type);
-                set(ref(db, `rooms/${roomId}/ice/host_${playerId}`), JSON.stringify(e.candidate));
+                const iceRef = ref(db, `rooms/${roomId}/ice/host_${playerId}/${Date.now()}`);
+                set(iceRef, JSON.stringify(e.candidate));
             }
         };
 
@@ -84,13 +85,22 @@ export class WebRTCManager {
 
         onValue(ref(db, `rooms/${roomId}/answers/${playerId}`), async (snapshot) => {
             if (snapshot.val() && pc.remoteDescription === null) {
+                console.log('[Host] Received answer from player:', playerId);
                 await pc.setRemoteDescription(JSON.parse(snapshot.val()));
             }
         });
 
         onValue(ref(db, `rooms/${roomId}/ice/player_${playerId}`), async (snapshot) => {
-            if (snapshot.val()) {
-                await pc.addIceCandidate(JSON.parse(snapshot.val()));
+            const candidates = snapshot.val();
+            if (candidates && pc.remoteDescription) {
+                Object.values(candidates).forEach(async (candidateStr) => {
+                    console.log('[Host] Received ICE candidate from player');
+                    try {
+                        await pc.addIceCandidate(JSON.parse(candidateStr));
+                    } catch (e) {
+                        console.error('[Host] Error adding ICE candidate:', e);
+                    }
+                });
             }
         });
     }
@@ -131,22 +141,33 @@ export class WebRTCManager {
         pc.onicecandidate = (e) => {
             if (e.candidate) {
                 console.log('[Player] Sending ICE candidate:', e.candidate.type);
-                set(ref(db, `rooms/${roomId}/ice/player_${playerId}`), JSON.stringify(e.candidate));
+                const iceRef = ref(db, `rooms/${roomId}/ice/player_${playerId}/${Date.now()}`);
+                set(iceRef, JSON.stringify(e.candidate));
             }
         };
 
         onValue(ref(db, `rooms/${roomId}/offers/${playerId}`), async (snapshot) => {
             if (snapshot.val() && pc.remoteDescription === null) {
+                console.log('[Player] Received offer');
                 await pc.setRemoteDescription(JSON.parse(snapshot.val()));
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
+                console.log('[Player] Sending answer');
                 await set(ref(db, `rooms/${roomId}/answers/${playerId}`), JSON.stringify(answer));
             }
         });
 
         onValue(ref(db, `rooms/${roomId}/ice/host_${playerId}`), async (snapshot) => {
-            if (snapshot.val()) {
-                await pc.addIceCandidate(JSON.parse(snapshot.val()));
+            const candidates = snapshot.val();
+            if (candidates && pc.remoteDescription) {
+                Object.values(candidates).forEach(async (candidateStr) => {
+                    console.log('[Player] Received ICE candidate from host');
+                    try {
+                        await pc.addIceCandidate(JSON.parse(candidateStr));
+                    } catch (e) {
+                        console.error('[Player] Error adding ICE candidate:', e);
+                    }
+                });
             }
         });
 
