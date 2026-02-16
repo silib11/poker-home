@@ -43,6 +43,7 @@ export class WebRTCManager {
     }
 
     async connectToPlayer(roomId, playerId) {
+        console.log('[Host] Connecting to player:', playerId);
         const pc = new RTCPeerConnection({
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
@@ -55,6 +56,14 @@ export class WebRTCManager {
             ]
         });
 
+        pc.oniceconnectionstatechange = () => {
+            console.log('[Host] ICE state:', pc.iceConnectionState);
+        };
+
+        pc.onconnectionstatechange = () => {
+            console.log('[Host] Connection state:', pc.connectionState);
+        };
+
         const dataChannel = pc.createDataChannel('poker');
         const conn = { id: playerId, pc, dataChannel };
         this.connections.push(conn);
@@ -63,6 +72,7 @@ export class WebRTCManager {
 
         pc.onicecandidate = (e) => {
             if (e.candidate) {
+                console.log('[Host] Sending ICE candidate:', e.candidate.type);
                 set(ref(db, `rooms/${roomId}/ice/host_${playerId}`), JSON.stringify(e.candidate));
             }
         };
@@ -88,6 +98,7 @@ export class WebRTCManager {
         const playerId = Math.random().toString(36).substring(2, 8);
         this.playerId = playerId;
         
+        console.log('[Player] Joining room:', roomId, 'as', playerId);
         await set(ref(db, `rooms/${roomId}/players/${playerId}`), true);
 
         const pc = new RTCPeerConnection({
@@ -102,13 +113,23 @@ export class WebRTCManager {
             ]
         });
 
+        pc.oniceconnectionstatechange = () => {
+            console.log('[Player] ICE state:', pc.iceConnectionState);
+        };
+
+        pc.onconnectionstatechange = () => {
+            console.log('[Player] Connection state:', pc.connectionState);
+        };
+
         pc.ondatachannel = (e) => {
+            console.log('[Player] Data channel received');
             this.dataChannel = e.channel;
             this.setupDataChannel(this.dataChannel);
         };
 
         pc.onicecandidate = (e) => {
             if (e.candidate) {
+                console.log('[Player] Sending ICE candidate:', e.candidate.type);
                 set(ref(db, `rooms/${roomId}/ice/player_${playerId}`), JSON.stringify(e.candidate));
             }
         };
@@ -133,16 +154,23 @@ export class WebRTCManager {
 
     setupDataChannel(channel) {
         channel.onopen = () => {
+            console.log('[DataChannel] Opened');
             if (this.onStatusChange) this.onStatusChange('接続完了');
             if (this.onConnected) this.onConnected();
         };
 
         channel.onmessage = (e) => {
+            console.log('[DataChannel] Message received');
             if (this.onMessage) this.onMessage(e.data);
         };
 
         channel.onclose = () => {
+            console.log('[DataChannel] Closed');
             if (this.onStatusChange) this.onStatusChange('切断');
+        };
+
+        channel.onerror = (e) => {
+            console.error('[DataChannel] Error:', e);
         };
     }
 
