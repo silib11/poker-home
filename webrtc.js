@@ -92,7 +92,22 @@ export class WebRTCManager {
 
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        await set(ref(db, `rooms/${roomId}/offers/${playerId}`), JSON.stringify(offer));
+        
+        // Wait for ICE gathering to complete
+        await new Promise((resolve) => {
+            if (pc.iceGatheringState === 'complete') {
+                resolve();
+            } else {
+                pc.addEventListener('icegatheringstatechange', () => {
+                    if (pc.iceGatheringState === 'complete') {
+                        resolve();
+                    }
+                });
+            }
+        });
+        
+        console.log('[Host] ICE gathering complete, sending offer');
+        await set(ref(db, `rooms/${roomId}/offers/${playerId}`), JSON.stringify(pc.localDescription));
 
         onValue(ref(db, `rooms/${roomId}/answers/${playerId}`), async (snapshot) => {
             if (snapshot.val() && pc.remoteDescription === null) {
@@ -190,8 +205,22 @@ export class WebRTCManager {
                 await pc.setRemoteDescription(JSON.parse(snapshot.val()));
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
-                console.log('[Player] Sending answer');
-                await set(ref(db, `rooms/${roomId}/answers/${playerId}`), JSON.stringify(answer));
+                
+                // Wait for ICE gathering to complete
+                await new Promise((resolve) => {
+                    if (pc.iceGatheringState === 'complete') {
+                        resolve();
+                    } else {
+                        pc.addEventListener('icegatheringstatechange', () => {
+                            if (pc.iceGatheringState === 'complete') {
+                                resolve();
+                            }
+                        });
+                    }
+                });
+                
+                console.log('[Player] ICE gathering complete, sending answer');
+                await set(ref(db, `rooms/${roomId}/answers/${playerId}`), JSON.stringify(pc.localDescription));
                 
                 // Process queued candidates
                 console.log('[Player] Processing', iceCandidateQueue.length, 'queued candidates');
