@@ -116,18 +116,21 @@ export class WebRTCManager {
         });
         await pc.setLocalDescription(offer);
         
-        // Wait for ICE gathering to complete
-        await new Promise((resolve) => {
-            if (pc.iceGatheringState === 'complete') {
-                resolve();
-            } else {
-                pc.addEventListener('icegatheringstatechange', () => {
-                    if (pc.iceGatheringState === 'complete') {
-                        resolve();
-                    }
-                });
-            }
-        });
+        // Wait for ICE gathering to complete (with timeout)
+        await Promise.race([
+            new Promise((resolve) => {
+                if (pc.iceGatheringState === 'complete') {
+                    resolve();
+                } else {
+                    pc.addEventListener('icegatheringstatechange', () => {
+                        if (pc.iceGatheringState === 'complete') {
+                            resolve();
+                        }
+                    });
+                }
+            }),
+            new Promise((resolve) => setTimeout(resolve, 5000)) // 5 second timeout
+        ]);
         
         debugLog('[Host] ICE gathering complete, sending offer');
         await set(ref(db, `rooms/${roomId}/offers/${playerId}`), JSON.stringify(pc.localDescription));
@@ -203,18 +206,21 @@ export class WebRTCManager {
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
                 
-                // Wait for ICE gathering to complete
-                await new Promise((resolve) => {
-                    if (pc.iceGatheringState === 'complete') {
-                        resolve();
-                    } else {
-                        pc.addEventListener('icegatheringstatechange', () => {
-                            if (pc.iceGatheringState === 'complete') {
-                                resolve();
-                            }
-                        });
-                    }
-                });
+                // Wait for ICE gathering to complete (with timeout)
+                await Promise.race([
+                    new Promise((resolve) => {
+                        if (pc.iceGatheringState === 'complete') {
+                            resolve();
+                        } else {
+                            pc.addEventListener('icegatheringstatechange', () => {
+                                if (pc.iceGatheringState === 'complete') {
+                                    resolve();
+                                }
+                            });
+                        }
+                    }),
+                    new Promise((resolve) => setTimeout(resolve, 5000)) // 5 second timeout
+                ]);
                 
                 debugLog('[Player] ICE gathering complete, sending answer');
                 await set(ref(db, `rooms/${roomId}/answers/${playerId}`), JSON.stringify(pc.localDescription));
