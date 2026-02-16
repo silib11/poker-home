@@ -2,6 +2,22 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
 import { getDatabase, ref, set, onValue, remove } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js';
 
+// Debug logger
+const debugLog = (msg) => {
+    console.log(msg);
+    const logEl = document.getElementById('debug-log');
+    if (logEl) {
+        const time = new Date().toLocaleTimeString();
+        logEl.innerHTML += `[${time}] ${msg}<br>`;
+        logEl.scrollTop = logEl.scrollHeight;
+        // Keep only last 50 lines
+        const lines = logEl.innerHTML.split('<br>');
+        if (lines.length > 50) {
+            logEl.innerHTML = lines.slice(-50).join('<br>');
+        }
+    }
+};
+
 const firebaseConfig = {
     apiKey: "AIzaSyCc_I2QJWLdeVsaTW_g9Cs3SNK6KRnULeA",
     authDomain: "poker-home-62fab.firebaseapp.com",
@@ -44,7 +60,7 @@ export class WebRTCManager {
     }
 
     async connectToPlayer(roomId, playerId) {
-        console.log('[Host] Connecting to player:', playerId);
+        debugLog('[Host] Connecting to player: ' + playerId);
         const pc = new RTCPeerConnection({
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
@@ -67,11 +83,11 @@ export class WebRTCManager {
         const iceCandidateQueue = [];
 
         pc.oniceconnectionstatechange = () => {
-            console.log('[Host] ICE state:', pc.iceConnectionState);
+            debugLog('[Host] ICE state: ' + pc.iceConnectionState);
         };
 
         pc.onconnectionstatechange = () => {
-            console.log('[Host] Connection state:', pc.connectionState);
+            debugLog('[Host] Connection state: ' + pc.connectionState);
         };
 
         const dataChannel = pc.createDataChannel('poker');
@@ -82,11 +98,11 @@ export class WebRTCManager {
 
         pc.onicecandidate = (e) => {
             if (e.candidate) {
-                console.log('[Host] ICE candidate type:', e.candidate.type, 'protocol:', e.candidate.protocol, 'address:', e.candidate.address);
+                debugLog('[Host] ICE: ' + e.candidate.type + ' ' + e.candidate.protocol + ' ' + e.candidate.address);
                 const iceRef = ref(db, `rooms/${roomId}/ice/host_${playerId}/${Date.now()}`);
                 set(iceRef, JSON.stringify(e.candidate));
             } else {
-                console.log('[Host] ICE gathering complete');
+                debugLog('[Host] ICE gathering complete');
             }
         };
 
@@ -106,21 +122,21 @@ export class WebRTCManager {
             }
         });
         
-        console.log('[Host] ICE gathering complete, sending offer');
+        debugLog('[Host] ICE gathering complete, sending offer');
         await set(ref(db, `rooms/${roomId}/offers/${playerId}`), JSON.stringify(pc.localDescription));
 
         onValue(ref(db, `rooms/${roomId}/answers/${playerId}`), async (snapshot) => {
             if (snapshot.val() && pc.remoteDescription === null) {
-                console.log('[Host] Received answer from player:', playerId);
+                debugLog('[Host] Received answer from: ' + playerId);
                 await pc.setRemoteDescription(JSON.parse(snapshot.val()));
                 
                 // Process queued candidates
-                console.log('[Host] Processing', iceCandidateQueue.length, 'queued candidates');
+                debugLog('[Host] Processing ' + iceCandidateQueue.length + ' queued candidates');
                 for (const candidate of iceCandidateQueue) {
                     try {
                         await pc.addIceCandidate(candidate);
                     } catch (e) {
-                        console.error('[Host] Error adding queued candidate:', e);
+                        debugLog('ERROR [Host] queued candidate: ' + e);
                     }
                 }
                 iceCandidateQueue.length = 0;
@@ -133,11 +149,11 @@ export class WebRTCManager {
                 for (const candidateStr of Object.values(candidates)) {
                     const candidate = JSON.parse(candidateStr);
                     if (pc.remoteDescription) {
-                        console.log('[Host] Adding ICE candidate from player');
+                        debugLog('[Host] Adding ICE candidate from player');
                         try {
                             await pc.addIceCandidate(candidate);
                         } catch (e) {
-                            console.error('[Host] Error adding ICE candidate:', e);
+                            debugLog('ERROR [Host] ICE candidate: ' + e);
                         }
                     } else {
                         iceCandidateQueue.push(candidate);
@@ -151,7 +167,7 @@ export class WebRTCManager {
         const playerId = Math.random().toString(36).substring(2, 8);
         this.playerId = playerId;
         
-        console.log('[Player] Joining room:', roomId, 'as', playerId);
+        debugLog('[Player] Joining: ' + roomId + ' as ' + playerId);
         await set(ref(db, `rooms/${roomId}/players/${playerId}`), true);
 
         const pc = new RTCPeerConnection({
@@ -176,32 +192,32 @@ export class WebRTCManager {
         const iceCandidateQueue = [];
 
         pc.oniceconnectionstatechange = () => {
-            console.log('[Player] ICE state:', pc.iceConnectionState);
+            debugLog('[Player] ICE state: ' + pc.iceConnectionState);
         };
 
         pc.onconnectionstatechange = () => {
-            console.log('[Player] Connection state:', pc.connectionState);
+            debugLog('[Player] Connection state: ' + pc.connectionState);
         };
 
         pc.ondatachannel = (e) => {
-            console.log('[Player] Data channel received');
+            debugLog('[Player] Data channel received');
             this.dataChannel = e.channel;
             this.setupDataChannel(this.dataChannel);
         };
 
         pc.onicecandidate = (e) => {
             if (e.candidate) {
-                console.log('[Player] ICE candidate type:', e.candidate.type, 'protocol:', e.candidate.protocol, 'address:', e.candidate.address);
+                debugLog('[Player] ICE: ' + e.candidate.type + ' ' + e.candidate.protocol + ' ' + e.candidate.address);
                 const iceRef = ref(db, `rooms/${roomId}/ice/player_${playerId}/${Date.now()}`);
                 set(iceRef, JSON.stringify(e.candidate));
             } else {
-                console.log('[Player] ICE gathering complete');
+                debugLog('[Player] ICE gathering complete');
             }
         };
 
         onValue(ref(db, `rooms/${roomId}/offers/${playerId}`), async (snapshot) => {
             if (snapshot.val() && pc.remoteDescription === null) {
-                console.log('[Player] Received offer');
+                debugLog('[Player] Received offer');
                 await pc.setRemoteDescription(JSON.parse(snapshot.val()));
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
@@ -219,16 +235,16 @@ export class WebRTCManager {
                     }
                 });
                 
-                console.log('[Player] ICE gathering complete, sending answer');
+                debugLog('[Player] ICE gathering complete, sending answer');
                 await set(ref(db, `rooms/${roomId}/answers/${playerId}`), JSON.stringify(pc.localDescription));
                 
                 // Process queued candidates
-                console.log('[Player] Processing', iceCandidateQueue.length, 'queued candidates');
+                debugLog('[Player] Processing ' + iceCandidateQueue.length + ' queued candidates');
                 for (const candidate of iceCandidateQueue) {
                     try {
                         await pc.addIceCandidate(candidate);
                     } catch (e) {
-                        console.error('[Player] Error adding queued candidate:', e);
+                        debugLog('ERROR [Player] queued candidate: ' + e);
                     }
                 }
                 iceCandidateQueue.length = 0;
@@ -241,11 +257,11 @@ export class WebRTCManager {
                 for (const candidateStr of Object.values(candidates)) {
                     const candidate = JSON.parse(candidateStr);
                     if (pc.remoteDescription) {
-                        console.log('[Player] Adding ICE candidate from host');
+                        debugLog('[Player] Adding ICE candidate from host');
                         try {
                             await pc.addIceCandidate(candidate);
                         } catch (e) {
-                            console.error('[Player] Error adding ICE candidate:', e);
+                            debugLog('ERROR [Player] ICE candidate: ' + e);
                         }
                     } else {
                         iceCandidateQueue.push(candidate);
@@ -259,23 +275,23 @@ export class WebRTCManager {
 
     setupDataChannel(channel) {
         channel.onopen = () => {
-            console.log('[DataChannel] Opened');
+            debugLog('[DataChannel] Opened');
             if (this.onStatusChange) this.onStatusChange('接続完了');
             if (this.onConnected) this.onConnected();
         };
 
         channel.onmessage = (e) => {
-            console.log('[DataChannel] Message received');
+            debugLog('[DataChannel] Message received');
             if (this.onMessage) this.onMessage(e.data);
         };
 
         channel.onclose = () => {
-            console.log('[DataChannel] Closed');
+            debugLog('[DataChannel] Closed');
             if (this.onStatusChange) this.onStatusChange('切断');
         };
 
         channel.onerror = (e) => {
-            console.error('[DataChannel] Error:', e);
+            debugLog('ERROR: ' + '[DataChannel] Error:', e);
         };
     }
 
