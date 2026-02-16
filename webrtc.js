@@ -44,7 +44,15 @@ export class WebRTCManager {
 
     async connectToPlayer(roomId, playerId) {
         const pc = new RTCPeerConnection({
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun.cloudflare.com:3478' },
+                {
+                    urls: 'turn:turn.cloudflare.com:3478',
+                    username: 'cloudflare',
+                    credential: 'cloudflare'
+                }
+            ]
         });
 
         const dataChannel = pc.createDataChannel('poker');
@@ -83,7 +91,15 @@ export class WebRTCManager {
         await set(ref(db, `rooms/${roomId}/players/${playerId}`), true);
 
         const pc = new RTCPeerConnection({
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun.cloudflare.com:3478' },
+                {
+                    urls: 'turn:turn.cloudflare.com:3478',
+                    username: 'cloudflare',
+                    credential: 'cloudflare'
+                }
+            ]
         });
 
         pc.ondatachannel = (e) => {
