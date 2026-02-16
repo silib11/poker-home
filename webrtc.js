@@ -83,9 +83,11 @@ export class WebRTCManager {
 
         pc.onicecandidate = (e) => {
             if (e.candidate) {
-                console.log('[Host] Sending ICE candidate:', e.candidate.type);
+                console.log('[Host] ICE candidate type:', e.candidate.type, 'protocol:', e.candidate.protocol, 'address:', e.candidate.address);
                 const iceRef = ref(db, `rooms/${roomId}/ice/host_${playerId}/${Date.now()}`);
                 set(iceRef, JSON.stringify(e.candidate));
+            } else {
+                console.log('[Host] ICE gathering complete');
             }
         };
 
@@ -103,14 +105,14 @@ export class WebRTCManager {
         onValue(ref(db, `rooms/${roomId}/ice/player_${playerId}`), async (snapshot) => {
             const candidates = snapshot.val();
             if (candidates && pc.remoteDescription) {
-                Object.values(candidates).forEach(async (candidateStr) => {
-                    console.log('[Host] Received ICE candidate from player');
+                for (const candidateStr of Object.values(candidates)) {
+                    console.log('[Host] Adding ICE candidate from player');
                     try {
                         await pc.addIceCandidate(JSON.parse(candidateStr));
                     } catch (e) {
                         console.error('[Host] Error adding ICE candidate:', e);
                     }
-                });
+                }
             }
         });
     }
@@ -160,9 +162,11 @@ export class WebRTCManager {
 
         pc.onicecandidate = (e) => {
             if (e.candidate) {
-                console.log('[Player] Sending ICE candidate:', e.candidate.type);
+                console.log('[Player] ICE candidate type:', e.candidate.type, 'protocol:', e.candidate.protocol, 'address:', e.candidate.address);
                 const iceRef = ref(db, `rooms/${roomId}/ice/player_${playerId}/${Date.now()}`);
                 set(iceRef, JSON.stringify(e.candidate));
+            } else {
+                console.log('[Player] ICE gathering complete');
             }
         };
 
@@ -180,14 +184,14 @@ export class WebRTCManager {
         onValue(ref(db, `rooms/${roomId}/ice/host_${playerId}`), async (snapshot) => {
             const candidates = snapshot.val();
             if (candidates && pc.remoteDescription) {
-                Object.values(candidates).forEach(async (candidateStr) => {
-                    console.log('[Player] Received ICE candidate from host');
+                for (const candidateStr of Object.values(candidates)) {
+                    console.log('[Player] Adding ICE candidate from host');
                     try {
                         await pc.addIceCandidate(JSON.parse(candidateStr));
                     } catch (e) {
                         console.error('[Player] Error adding ICE candidate:', e);
                     }
-                });
+                }
             }
         });
 
