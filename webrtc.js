@@ -1,22 +1,5 @@
-// WebRTC Manager with TURN server support
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
 import { getDatabase, ref, set, onValue, remove } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js';
-
-// Debug logger
-const debugLog = (msg) => {
-    console.log(msg);
-    const logEl = document.getElementById('debug-log');
-    if (logEl) {
-        const time = new Date().toLocaleTimeString();
-        logEl.innerHTML += `[${time}] ${msg}<br>`;
-        logEl.scrollTop = logEl.scrollHeight;
-        // Keep only last 50 lines
-        const lines = logEl.innerHTML.split('<br>');
-        if (lines.length > 50) {
-            logEl.innerHTML = lines.slice(-50).join('<br>');
-        }
-    }
-};
 
 const firebaseConfig = {
     apiKey: "AIzaSyCc_I2QJWLdeVsaTW_g9Cs3SNK6KRnULeA",
@@ -41,7 +24,7 @@ export class WebRTCManager {
     }
 
     async createRoom() {
-        const roomId = Math.floor(100000 + Math.random() * 900000).toString();
+        const roomId = Math.random().toString(36).substring(2, 8);
         this.roomId = roomId;
         
         // Listen for new players
@@ -60,39 +43,9 @@ export class WebRTCManager {
     }
 
     async connectToPlayer(roomId, playerId) {
-        debugLog('[Host] Connecting to player: ' + playerId);
         const pc = new RTCPeerConnection({
-            iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' },
-                {
-                    urls: 'turn:numb.viagenie.ca',
-                    username: 'webrtc@live.com',
-                    credential: 'muazkh'
-                },
-                {
-                    urls: 'turn:192.158.29.39:3478?transport=udp',
-                    username: 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
-                    credential: '28224511:1379330808'
-                },
-                {
-                    urls: 'turn:192.158.29.39:3478?transport=tcp',
-                    username: 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
-                    credential: '28224511:1379330808'
-                }
-            ],
-            iceTransportPolicy: 'all',
-            iceCandidatePoolSize: 10
+            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
         });
-
-
-        pc.oniceconnectionstatechange = () => {
-            debugLog('[Host] ICE state: ' + pc.iceConnectionState);
-        };
-
-        pc.onconnectionstatechange = () => {
-            debugLog('[Host] Connection state: ' + pc.connectionState);
-        };
 
         const dataChannel = pc.createDataChannel('poker');
         const conn = { id: playerId, pc, dataChannel };
@@ -102,44 +55,23 @@ export class WebRTCManager {
 
         pc.onicecandidate = (e) => {
             if (e.candidate) {
-                debugLog('[Host] ICE: ' + e.candidate.type + ' ' + e.candidate.protocol + ' ' + e.candidate.address);
-                // ICE candidates are included in the offer, no need to send separately
-            } else {
-                debugLog('[Host] ICE gathering complete');
+                set(ref(db, `rooms/${roomId}/ice/host_${playerId}`), JSON.stringify(e.candidate));
             }
         };
 
-        const offer = await pc.createOffer({
-            offerToReceiveAudio: false,
-            offerToReceiveVideo: false,
-            iceRestart: false
-        });
+        const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        
-        // Wait for ICE gathering to complete (with timeout)
-        await Promise.race([
-            new Promise((resolve) => {
-                if (pc.iceGatheringState === 'complete') {
-                    resolve();
-                } else {
-                    pc.addEventListener('icegatheringstatechange', () => {
-                        if (pc.iceGatheringState === 'complete') {
-                            resolve();
-                        }
-                    });
-                }
-            }),
-            new Promise((resolve) => setTimeout(resolve, 5000)) // 5 second timeout
-        ]);
-        
-        debugLog('[Host] ICE gathering complete, sending offer');
-        await set(ref(db, `rooms/${roomId}/offers/${playerId}`), JSON.stringify(pc.localDescription));
+        await set(ref(db, `rooms/${roomId}/offers/${playerId}`), JSON.stringify(offer));
 
         onValue(ref(db, `rooms/${roomId}/answers/${playerId}`), async (snapshot) => {
             if (snapshot.val() && pc.remoteDescription === null) {
-                debugLog('[Host] Received answer from: ' + playerId);
                 await pc.setRemoteDescription(JSON.parse(snapshot.val()));
-                debugLog('[Host] Remote description set, ICE should connect now');
+            }
+        });
+
+        onValue(ref(db, `rooms/${roomId}/ice/player_${playerId}`), async (snapshot) => {
+            if (snapshot.val()) {
+                await pc.addIceCandidate(JSON.parse(snapshot.val()));
             }
         });
     }
@@ -148,83 +80,35 @@ export class WebRTCManager {
         const playerId = Math.random().toString(36).substring(2, 8);
         this.playerId = playerId;
         
-        debugLog('[Player] Joining: ' + roomId + ' as ' + playerId);
         await set(ref(db, `rooms/${roomId}/players/${playerId}`), true);
 
         const pc = new RTCPeerConnection({
-            iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' },
-                {
-                    urls: 'turn:numb.viagenie.ca',
-                    username: 'webrtc@live.com',
-                    credential: 'muazkh'
-                },
-                {
-                    urls: 'turn:192.158.29.39:3478?transport=udp',
-                    username: 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
-                    credential: '28224511:1379330808'
-                },
-                {
-                    urls: 'turn:192.158.29.39:3478?transport=tcp',
-                    username: 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
-                    credential: '28224511:1379330808'
-                }
-            ],
-            iceTransportPolicy: 'all',
-            iceCandidatePoolSize: 10
+            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
         });
 
-
-        pc.oniceconnectionstatechange = () => {
-            debugLog('[Player] ICE state: ' + pc.iceConnectionState);
-        };
-
-        pc.onconnectionstatechange = () => {
-            debugLog('[Player] Connection state: ' + pc.connectionState);
-        };
-
         pc.ondatachannel = (e) => {
-            debugLog('[Player] Data channel received');
             this.dataChannel = e.channel;
             this.setupDataChannel(this.dataChannel);
         };
 
         pc.onicecandidate = (e) => {
             if (e.candidate) {
-                debugLog('[Player] ICE: ' + e.candidate.type + ' ' + e.candidate.protocol + ' ' + e.candidate.address);
-                // ICE candidates are included in the answer, no need to send separately
-            } else {
-                debugLog('[Player] ICE gathering complete');
+                set(ref(db, `rooms/${roomId}/ice/player_${playerId}`), JSON.stringify(e.candidate));
             }
         };
 
         onValue(ref(db, `rooms/${roomId}/offers/${playerId}`), async (snapshot) => {
             if (snapshot.val() && pc.remoteDescription === null) {
-                debugLog('[Player] Received offer');
                 await pc.setRemoteDescription(JSON.parse(snapshot.val()));
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
-                
-                // Wait for ICE gathering to complete (with timeout)
-                await Promise.race([
-                    new Promise((resolve) => {
-                        if (pc.iceGatheringState === 'complete') {
-                            resolve();
-                        } else {
-                            pc.addEventListener('icegatheringstatechange', () => {
-                                if (pc.iceGatheringState === 'complete') {
-                                    resolve();
-                                }
-                            });
-                        }
-                    }),
-                    new Promise((resolve) => setTimeout(resolve, 5000)) // 5 second timeout
-                ]);
-                
-                debugLog('[Player] ICE gathering complete, sending answer');
-                await set(ref(db, `rooms/${roomId}/answers/${playerId}`), JSON.stringify(pc.localDescription));
-                debugLog('[Player] Answer sent, ICE should connect now');
+                await set(ref(db, `rooms/${roomId}/answers/${playerId}`), JSON.stringify(answer));
+            }
+        });
+
+        onValue(ref(db, `rooms/${roomId}/ice/host_${playerId}`), async (snapshot) => {
+            if (snapshot.val()) {
+                await pc.addIceCandidate(JSON.parse(snapshot.val()));
             }
         });
 
@@ -233,23 +117,16 @@ export class WebRTCManager {
 
     setupDataChannel(channel) {
         channel.onopen = () => {
-            debugLog('[DataChannel] Opened');
             if (this.onStatusChange) this.onStatusChange('接続完了');
             if (this.onConnected) this.onConnected();
         };
 
         channel.onmessage = (e) => {
-            debugLog('[DataChannel] Message received');
             if (this.onMessage) this.onMessage(e.data);
         };
 
         channel.onclose = () => {
-            debugLog('[DataChannel] Closed');
             if (this.onStatusChange) this.onStatusChange('切断');
-        };
-
-        channel.onerror = (e) => {
-            debugLog('ERROR: ' + '[DataChannel] Error:', e);
         };
     }
 
