@@ -111,7 +111,11 @@ export class WebRTCManager {
             }
         };
 
-        const offer = await pc.createOffer();
+        const offer = await pc.createOffer({
+            offerToReceiveAudio: false,
+            offerToReceiveVideo: false,
+            iceRestart: false
+        });
         await pc.setLocalDescription(offer);
         
         // Wait for ICE gathering to complete
@@ -153,6 +157,7 @@ export class WebRTCManager {
             if (candidates) {
                 for (const candidateStr of Object.values(candidates)) {
                     const candidate = JSON.parse(candidateStr);
+                    debugLog('[Host] Received ICE from player: ' + candidate.type);
                     if (pc.remoteDescription) {
                         debugLog('[Host] Adding ICE candidate from player');
                         try {
@@ -266,6 +271,7 @@ export class WebRTCManager {
             if (candidates) {
                 for (const candidateStr of Object.values(candidates)) {
                     const candidate = JSON.parse(candidateStr);
+                    debugLog('[Player] Received ICE from host: ' + candidate.type);
                     if (pc.remoteDescription) {
                         debugLog('[Player] Adding ICE candidate from host');
                         try {
