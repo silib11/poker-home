@@ -49,23 +49,22 @@ export class WebRTCManager {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
                 { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' },
                 {
-                    urls: 'turn:openrelay.metered.ca:80',
-                    username: 'openrelayproject',
-                    credential: 'openrelayproject'
-                },
-                {
-                    urls: 'turn:openrelay.metered.ca:443',
-                    username: 'openrelayproject',
-                    credential: 'openrelayproject'
-                },
-                {
-                    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                    urls: [
+                        'turn:openrelay.metered.ca:80',
+                        'turn:openrelay.metered.ca:443',
+                        'turns:openrelay.metered.ca:443'
+                    ],
                     username: 'openrelayproject',
                     credential: 'openrelayproject'
                 }
-            ]
+            ],
+            iceTransportPolicy: 'all',
+            iceCandidatePoolSize: 10
         });
+
+        const iceCandidateQueue = [];
 
         pc.oniceconnectionstatechange = () => {
             console.log('[Host] ICE state:', pc.iceConnectionState);
@@ -99,18 +98,34 @@ export class WebRTCManager {
             if (snapshot.val() && pc.remoteDescription === null) {
                 console.log('[Host] Received answer from player:', playerId);
                 await pc.setRemoteDescription(JSON.parse(snapshot.val()));
+                
+                // Process queued candidates
+                console.log('[Host] Processing', iceCandidateQueue.length, 'queued candidates');
+                for (const candidate of iceCandidateQueue) {
+                    try {
+                        await pc.addIceCandidate(candidate);
+                    } catch (e) {
+                        console.error('[Host] Error adding queued candidate:', e);
+                    }
+                }
+                iceCandidateQueue.length = 0;
             }
         });
 
         onValue(ref(db, `rooms/${roomId}/ice/player_${playerId}`), async (snapshot) => {
             const candidates = snapshot.val();
-            if (candidates && pc.remoteDescription) {
+            if (candidates) {
                 for (const candidateStr of Object.values(candidates)) {
-                    console.log('[Host] Adding ICE candidate from player');
-                    try {
-                        await pc.addIceCandidate(JSON.parse(candidateStr));
-                    } catch (e) {
-                        console.error('[Host] Error adding ICE candidate:', e);
+                    const candidate = JSON.parse(candidateStr);
+                    if (pc.remoteDescription) {
+                        console.log('[Host] Adding ICE candidate from player');
+                        try {
+                            await pc.addIceCandidate(candidate);
+                        } catch (e) {
+                            console.error('[Host] Error adding ICE candidate:', e);
+                        }
+                    } else {
+                        iceCandidateQueue.push(candidate);
                     }
                 }
             }
@@ -128,23 +143,22 @@ export class WebRTCManager {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
                 { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' },
                 {
-                    urls: 'turn:openrelay.metered.ca:80',
-                    username: 'openrelayproject',
-                    credential: 'openrelayproject'
-                },
-                {
-                    urls: 'turn:openrelay.metered.ca:443',
-                    username: 'openrelayproject',
-                    credential: 'openrelayproject'
-                },
-                {
-                    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                    urls: [
+                        'turn:openrelay.metered.ca:80',
+                        'turn:openrelay.metered.ca:443',
+                        'turns:openrelay.metered.ca:443'
+                    ],
                     username: 'openrelayproject',
                     credential: 'openrelayproject'
                 }
-            ]
+            ],
+            iceTransportPolicy: 'all',
+            iceCandidatePoolSize: 10
         });
+
+        const iceCandidateQueue = [];
 
         pc.oniceconnectionstatechange = () => {
             console.log('[Player] ICE state:', pc.iceConnectionState);
@@ -178,18 +192,34 @@ export class WebRTCManager {
                 await pc.setLocalDescription(answer);
                 console.log('[Player] Sending answer');
                 await set(ref(db, `rooms/${roomId}/answers/${playerId}`), JSON.stringify(answer));
+                
+                // Process queued candidates
+                console.log('[Player] Processing', iceCandidateQueue.length, 'queued candidates');
+                for (const candidate of iceCandidateQueue) {
+                    try {
+                        await pc.addIceCandidate(candidate);
+                    } catch (e) {
+                        console.error('[Player] Error adding queued candidate:', e);
+                    }
+                }
+                iceCandidateQueue.length = 0;
             }
         });
 
         onValue(ref(db, `rooms/${roomId}/ice/host_${playerId}`), async (snapshot) => {
             const candidates = snapshot.val();
-            if (candidates && pc.remoteDescription) {
+            if (candidates) {
                 for (const candidateStr of Object.values(candidates)) {
-                    console.log('[Player] Adding ICE candidate from host');
-                    try {
-                        await pc.addIceCandidate(JSON.parse(candidateStr));
-                    } catch (e) {
-                        console.error('[Player] Error adding ICE candidate:', e);
+                    const candidate = JSON.parse(candidateStr);
+                    if (pc.remoteDescription) {
+                        console.log('[Player] Adding ICE candidate from host');
+                        try {
+                            await pc.addIceCandidate(candidate);
+                        } catch (e) {
+                            console.error('[Player] Error adding ICE candidate:', e);
+                        }
+                    } else {
+                        iceCandidateQueue.push(candidate);
                     }
                 }
             }
