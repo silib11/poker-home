@@ -41,7 +41,7 @@ export class WebRTCManager {
     }
 
     async createRoom() {
-        const roomId = Math.random().toString(36).substring(2, 8);
+        const roomId = Math.floor(100000 + Math.random() * 900000).toString();
         this.roomId = roomId;
         
         // Listen for new players
