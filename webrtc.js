@@ -24,7 +24,12 @@ export class WebRTCManager {
     }
 
     async createRoom() {
-        const roomId = Math.random().toString(36).substring(2, 8);
+        // アルファベットのみのルームID生成（6文字）
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        let roomId = '';
+        for (let i = 0; i < 6; i++) {
+            roomId += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
         this.roomId = roomId;
         
         // Listen for new players
