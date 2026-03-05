@@ -49,7 +49,11 @@ export class WebRTCManager {
 
     async connectToPlayer(roomId, playerId) {
         const pc = new RTCPeerConnection({
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' }
+            ]
         });
 
         const dataChannel = pc.createDataChannel('poker');
@@ -58,25 +62,51 @@ export class WebRTCManager {
 
         this.setupDataChannel(dataChannel);
 
+        // 接続状態の監視
+        pc.onconnectionstatechange = () => {
+            console.log(`[Host→${playerId}] 接続状態: ${pc.connectionState}`);
+            if (this.onStatusChange) {
+                this.onStatusChange(`接続状態: ${pc.connectionState}`);
+            }
+        };
+
+        pc.oniceconnectionstatechange = () => {
+            console.log(`[Host→${playerId}] ICE状態: ${pc.iceConnectionState}`);
+        };
+
+        // ICE候補を配列で保存
+        let iceIndex = 0;
         pc.onicecandidate = (e) => {
             if (e.candidate) {
-                set(ref(db, `rooms/${roomId}/ice/host_${playerId}`), JSON.stringify(e.candidate));
+                console.log(`[Host→${playerId}] ICE候補送信: ${iceIndex}`);
+                set(ref(db, `rooms/${roomId}/ice/host_${playerId}/${iceIndex++}`), JSON.stringify(e.candidate));
             }
         };
 
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         await set(ref(db, `rooms/${roomId}/offers/${playerId}`), JSON.stringify(offer));
+        console.log(`[Host→${playerId}] Offer送信完了`);
 
         onValue(ref(db, `rooms/${roomId}/answers/${playerId}`), async (snapshot) => {
             if (snapshot.val() && pc.remoteDescription === null) {
+                console.log(`[Host→${playerId}] Answer受信`);
                 await pc.setRemoteDescription(JSON.parse(snapshot.val()));
             }
         });
 
+        // ICE候補を配列で受信
         onValue(ref(db, `rooms/${roomId}/ice/player_${playerId}`), async (snapshot) => {
             if (snapshot.val()) {
-                await pc.addIceCandidate(JSON.parse(snapshot.val()));
+                const candidates = snapshot.val();
+                for (const key in candidates) {
+                    try {
+                        await pc.addIceCandidate(JSON.parse(candidates[key]));
+                        console.log(`[Host→${playerId}] ICE候補追加: ${key}`);
+                    } catch (err) {
+                        console.error(`[Host→${playerId}] ICE候補追加エラー:`, err);
+                    }
+                }
             }
         });
     }
@@ -85,35 +115,67 @@ export class WebRTCManager {
         const playerId = Math.random().toString(36).substring(2, 8);
         this.playerId = playerId;
         
+        console.log(`[Player ${playerId}] ルーム参加: ${roomId}`);
         await set(ref(db, `rooms/${roomId}/players/${playerId}`), true);
 
         const pc = new RTCPeerConnection({
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' }
+            ]
         });
 
         pc.ondatachannel = (e) => {
+            console.log(`[Player ${playerId}] DataChannel受信`);
             this.dataChannel = e.channel;
             this.setupDataChannel(this.dataChannel);
         };
 
+        // 接続状態の監視
+        pc.onconnectionstatechange = () => {
+            console.log(`[Player ${playerId}] 接続状態: ${pc.connectionState}`);
+            if (this.onStatusChange) {
+                this.onStatusChange(`接続状態: ${pc.connectionState}`);
+            }
+        };
+
+        pc.oniceconnectionstatechange = () => {
+            console.log(`[Player ${playerId}] ICE状態: ${pc.iceConnectionState}`);
+        };
+
+        // ICE候補を配列で保存
+        let iceIndex = 0;
         pc.onicecandidate = (e) => {
             if (e.candidate) {
-                set(ref(db, `rooms/${roomId}/ice/player_${playerId}`), JSON.stringify(e.candidate));
+                console.log(`[Player ${playerId}] ICE候補送信: ${iceIndex}`);
+                set(ref(db, `rooms/${roomId}/ice/player_${playerId}/${iceIndex++}`), JSON.stringify(e.candidate));
             }
         };
 
         onValue(ref(db, `rooms/${roomId}/offers/${playerId}`), async (snapshot) => {
             if (snapshot.val() && pc.remoteDescription === null) {
+                console.log(`[Player ${playerId}] Offer受信`);
                 await pc.setRemoteDescription(JSON.parse(snapshot.val()));
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
                 await set(ref(db, `rooms/${roomId}/answers/${playerId}`), JSON.stringify(answer));
+                console.log(`[Player ${playerId}] Answer送信完了`);
             }
         });
 
+        // ICE候補を配列で受信
         onValue(ref(db, `rooms/${roomId}/ice/host_${playerId}`), async (snapshot) => {
             if (snapshot.val()) {
-                await pc.addIceCandidate(JSON.parse(snapshot.val()));
+                const candidates = snapshot.val();
+                for (const key in candidates) {
+                    try {
+                        await pc.addIceCandidate(JSON.parse(candidates[key]));
+                        console.log(`[Player ${playerId}] ICE候補追加: ${key}`);
+                    } catch (err) {
+                        console.error(`[Player ${playerId}] ICE候補追加エラー:`, err);
+                    }
+                }
             }
         });
 
@@ -122,6 +184,7 @@ export class WebRTCManager {
 
     setupDataChannel(channel) {
         channel.onopen = () => {
+            console.log('[DataChannel] 接続完了');
             if (this.onStatusChange) this.onStatusChange('接続完了');
             if (this.onConnected) this.onConnected();
         };
@@ -131,7 +194,13 @@ export class WebRTCManager {
         };
 
         channel.onclose = () => {
+            console.log('[DataChannel] 切断');
             if (this.onStatusChange) this.onStatusChange('切断');
+        };
+
+        channel.onerror = (err) => {
+            console.error('[DataChannel] エラー:', err);
+            if (this.onStatusChange) this.onStatusChange('エラー');
         };
     }
 
