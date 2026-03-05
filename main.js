@@ -174,6 +174,10 @@ startGameBtn.addEventListener('click', () => {
     gameScreen.style.display = 'block';
     hostControls.style.display = 'block';
     
+    // ゲーム中のスクロール無効化
+    document.body.classList.add('game-active');
+    gameScreen.classList.add('playing');
+    
     sbControl.value = gameState.sb;
     bbControl.value = gameState.bb;
     
@@ -222,6 +226,11 @@ function handleMessage(msg) {
     
     if (data.type === 'game_start') {
         nextHandReady.clear();
+        
+        // ゲーム中のスクロール無効化
+        document.body.classList.add('game-active');
+        gameScreen.classList.add('playing');
+        
         renderGame(data.state);
         status.textContent = `ゲーム開始 - ${data.state.phase}`;
     }
@@ -525,9 +534,8 @@ function renderGame(state) {
     });
     html += '</div>';
     
-    const currentBets = state.players.reduce((sum, p) => sum + p.bet, 0);
-    const totalPot = state.pot + currentBets;
-    html += `<div style="font-size:16px; font-weight:bold; color:#ffd700;">ポット: ${totalPot}</div>`;
+    // POTは確定分のみ表示（ベット中は含めない）
+    html += `<div style="font-size:16px; font-weight:bold; color:#ffd700;">ポット: ${state.pot}</div>`;
     html += '</div>';
     
     // プレイヤー座席
@@ -553,19 +561,31 @@ function renderGame(state) {
         if (isSB) badges += '<span class="blind-badge">SB</span>';
         if (isBB) badges += '<span class="blind-badge">BB</span>';
         
-        // その他のポジション（3人以上の場合）
-        if (!isDealer && !isSB && !isBB && state.players.length >= 3) {
+        // ポジション表示（右上）
+        let positionBadge = '';
+        if (isDealer) {
+            positionBadge = '<span class="position-badge" style="background:linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);">BTN</span>';
+        } else if (isSB) {
+            positionBadge = '<span class="position-badge" style="background:linear-gradient(135deg, #66ccff 0%, #3399ff 100%);">SB</span>';
+        } else if (isBB) {
+            positionBadge = '<span class="position-badge" style="background:linear-gradient(135deg, #ff6666 0%, #ff3333 100%);">BB</span>';
+        } else if (state.players.length >= 3) {
             const position = getPositionName(i, state.dealerIndex, state.players.length);
-            if (position) {
-                badges += `<span class="blind-badge" style="background:#666;">${position}</span>`;
+            if (position === 'UTG') {
+                positionBadge = '<span class="position-badge" style="background:linear-gradient(135deg, #9966ff 0%, #7744ff 100%);">UTG</span>';
+            } else if (position === 'MP') {
+                positionBadge = '<span class="position-badge" style="background:linear-gradient(135deg, #66ff99 0%, #33ff66 100%);">MP</span>';
+            } else if (position === 'CO') {
+                positionBadge = '<span class="position-badge" style="background:linear-gradient(135deg, #ff9966 0%, #ff7733 100%);">CO</span>';
             }
         }
         
         html += `<div class="${seatClass}" style="left:${pos.x}%; top:${pos.y}%; transform:translate(-50%, -50%);">`;
+        html += positionBadge;
         html += `<div style="font-weight:bold; font-size:13px;">${p.name} ${badges}</div>`;
-        html += `<div style="font-size:11px; color:#aaa;">${p.chips}</div>`;
+        html += `<div style="font-size:11px; color:#aaa;">チップ: ${p.chips}</div>`;
         if (p.bet > 0) {
-            html += `<div style="font-size:11px; color:#ffff66;">ベット: ${p.bet}</div>`;
+            html += `<div style="font-size:12px; font-weight:bold; color:#ffff66; background:rgba(255,255,102,0.2); padding:2px 4px; border-radius:4px; margin-top:2px;">ベット: ${p.bet}</div>`;
         }
         html += '</div>';
     });
