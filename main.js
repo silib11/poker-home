@@ -348,24 +348,42 @@ function renderGame(state) {
     const gameArea = document.getElementById('game-area');
     
     const getCardColor = (suit) => {
-        if (suit === '♥') return '#ff0000';
-        if (suit === '♦') return '#0066ff';
-        if (suit === '♣') return '#00aa00';
-        if (suit === '♠') return '#000000';
+        return (suit === '♥' || suit === '♦') ? 'red' : 'black';
     };
     
-    const renderCard = (card) => {
-        return `<span style="display:inline-block; background:#fff; color:${getCardColor(card.suit)}; padding:8px 12px; margin:0 3px; border-radius:6px; font-size:28px; font-weight:bold; box-shadow:0 2px 4px rgba(0,0,0,0.3);">${card.suit}${card.rank}</span>`;
+    const renderCard = (card, isMini = false) => {
+        const colorClass = getCardColor(card.suit);
+        if (isMini) {
+            return `<div class="mini-card"></div>`;
+        }
+        return `<div class="card ${colorClass}"><span class="card-value">${card.rank}</span><span class="card-suit">${card.suit}</span></div>`;
     };
     
-    // プレイヤーの座席位置を計算（円形配置）
-    const getPlayerPosition = (index, total) => {
-        const angle = (index / total) * 2 * Math.PI - Math.PI / 2;
-        const radiusX = 45; // 横方向の半径（%）
-        const radiusY = 40; // 縦方向の半径（%）
-        const x = 50 + radiusX * Math.cos(angle);
-        const y = 50 + radiusY * Math.sin(angle);
-        return { x, y };
+    const renderMyCard = (card) => {
+        const colorClass = getCardColor(card.suit);
+        return `<div class="my-card ${colorClass}"><span class="card-value">${card.rank}</span><span class="card-suit">${card.suit}</span></div>`;
+    };
+    
+    const getOpponentPositions = (count) => {
+        const W = 390;
+        const H = 420;
+        const centerX = W / 2;
+        const centerY = H / 2 - 20;
+        const radiusX = 160;
+        const radiusY = 180;
+        const positions = [];
+        const opponentCount = count - 1;
+        
+        for (let i = 0; i < opponentCount; i++) {
+            const startAngle = 200;
+            const endAngle = 340;
+            const angleRange = endAngle - startAngle;
+            const angle = (startAngle + (angleRange / (opponentCount + 1)) * (i + 1)) * (Math.PI / 180);
+            const x = centerX + radiusX * Math.cos(angle);
+            const y = centerY + radiusY * Math.sin(angle);
+            positions.push({ x, y });
+        }
+        return positions;
     };
     
     // ポジション名を取得
@@ -403,6 +421,9 @@ function renderGame(state) {
         
         return null;
     };
+    
+    const myPlayer = state.players.find(p => p.id === myPlayerId);
+    const myIndex = state.players.findIndex(p => p.id === myPlayerId);
     
     // WINNER時の処理（フォールドで勝利、手札非公開）
     if (state.phase === 'WINNER') {
@@ -523,133 +544,144 @@ function renderGame(state) {
         return;
     }
     
-    // ポーカーテーブル
-    let html = '<div id="poker-table">';
+    // 新しいUI構造
+    let html = '<div class="game-container">';
     
-    // テーブル中央（コミュニティカード＋ポット）
-    html += '<div class="table-center">';
-    html += '<div style="margin:10px 0;">';
-    state.community.forEach(card => {
-        html += renderCard(card);
-    });
+    // Table Area
+    html += '<div class="table-area">';
+    html += '<div class="poker-table">';
+    html += '<div class="pot-display">';
+    html += '<div class="pot-label">Pot</div>';
+    html += `<div class="pot-amount">$${state.pot}</div>`;
     html += '</div>';
+    html += '<div class="community-cards">';
+    state.community.forEach(card => html += renderCard(card));
+    const remainingCards = 5 - state.community.length;
+    for (let i = 0; i < remainingCards; i++) {
+        html += '<div class="card hidden"></div>';
+    }
+    html += '</div></div>';
     
-    // POTは確定分のみ表示（ベット中は含めない）
-    html += `<div style="font-size:16px; font-weight:bold; color:#ffd700;">ポット: ${state.pot}</div>`;
-    html += '</div>';
-    
-    // プレイヤー座席
+    // Opponents
+    html += '<div class="players-container">';
+    const positions = getOpponentPositions(state.players.length);
     state.players.forEach((p, i) => {
-        const pos = getPlayerPosition(i, state.players.length);
+        if (p.id === myPlayerId) return;
+        
+        const opponentIndex = i > myIndex ? i - 1 : i;
+        if (opponentIndex >= positions.length) return;
+        
+        const pos = positions[opponentIndex];
         const isTurn = i === state.turnIndex;
-        const isFolded = p.folded;
-        const isMe = p.id === myPlayerId;
-        
-        const sbIndex = (state.dealerIndex + 1) % state.players.length;
-        const bbIndex = (state.dealerIndex + 2) % state.players.length;
         const isDealer = i === state.dealerIndex;
-        const isSB = i === sbIndex;
-        const isBB = i === bbIndex;
+        const hasBet = p.bet > 0;
         
-        let seatClass = 'player-seat';
-        if (isTurn) seatClass += ' active';
-        if (isFolded) seatClass += ' folded';
-        if (isMe) seatClass += ' my-seat';
+        let classes = 'opponent';
+        if (isTurn) classes += ' is-active';
+        if (isDealer) classes += ' is-dealer';
+        if (hasBet) classes += ' has-bet';
         
-        let badges = '';
-        if (isDealer) badges += '<span class="blind-badge" style="background:#ffd700;">D</span>';
-        if (isSB) badges += '<span class="blind-badge">SB</span>';
-        if (isBB) badges += '<span class="blind-badge">BB</span>';
-        
-        // ポジション表示（右上）
-        let positionBadge = '';
-        if (isDealer) {
-            positionBadge = '<span class="position-badge" style="background:linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);">BTN</span>';
-        } else if (isSB) {
-            positionBadge = '<span class="position-badge" style="background:linear-gradient(135deg, #66ccff 0%, #3399ff 100%);">SB</span>';
-        } else if (isBB) {
-            positionBadge = '<span class="position-badge" style="background:linear-gradient(135deg, #ff6666 0%, #ff3333 100%);">BB</span>';
-        } else if (state.players.length >= 3) {
-            const position = getPositionName(i, state.dealerIndex, state.players.length);
-            if (position === 'UTG') {
-                positionBadge = '<span class="position-badge" style="background:linear-gradient(135deg, #9966ff 0%, #7744ff 100%);">UTG</span>';
-            } else if (position === 'MP') {
-                positionBadge = '<span class="position-badge" style="background:linear-gradient(135deg, #66ff99 0%, #33ff66 100%);">MP</span>';
-            } else if (position === 'CO') {
-                positionBadge = '<span class="position-badge" style="background:linear-gradient(135deg, #ff9966 0%, #ff7733 100%);">CO</span>';
-            }
-        }
-        
-        html += `<div class="${seatClass}" style="left:${pos.x}%; top:${pos.y}%; transform:translate(-50%, -50%);">`;
-        html += positionBadge;
-        html += `<div style="font-weight:bold; font-size:13px;">${p.name} ${badges}</div>`;
-        html += `<div style="font-size:11px; color:#aaa;">チップ: ${p.chips}</div>`;
-        if (p.bet > 0) {
-            html += `<div style="font-size:12px; font-weight:bold; color:#ffff66; background:rgba(255,255,102,0.2); padding:2px 4px; border-radius:4px; margin-top:2px;">ベット: ${p.bet}</div>`;
-        }
+        html += `<div class="${classes}" style="left:${pos.x}px; top:${pos.y}px;">`;
+        html += '<div class="opponent-box">';
+        html += '<span class="dealer-chip">D</span>';
+        html += `<span class="opponent-name">${p.name}</span>`;
+        html += `<span class="opponent-stack">$${p.chips}</span>`;
+        if (p.lastAction) html += `<span class="opponent-action">${p.lastAction}</span>`;
+        html += '</div>';
+        html += '<div class="opponent-cards">';
+        html += renderCard({}, true);
+        html += renderCard({}, true);
+        html += '</div>';
+        html += `<div class="bet-badge">$${p.bet}</div>`;
         html += '</div>';
     });
+    html += '</div></div>';
     
-    html += '</div>';
+    // Bottom Area
+    html += '<div class="bottom-area">';
     
-    // 自分の手札とアクション
-    const myPlayer = state.players.find(p => p.id === myPlayerId);
-    if (myPlayer && myPlayer.hand && myPlayer.hand.length > 0) {
-        html += '<div id="my-hand">';
-        html += '<div style="margin:10px 0;">';
-        myPlayer.hand.forEach(card => {
-            html += renderCard(card);
-        });
-        html += '</div>';
-        html += '</div>';
+    // My Stack
+    html += '<div class="my-stack-area"><div class="my-stack-box">';
+    html += '<div class="my-stack-label">My Stack</div>';
+    html += `<div class="my-stack-value">$${myPlayer ? myPlayer.chips : 0}</div>`;
+    html += '</div></div>';
+    
+    // My Hand
+    html += '<div class="my-hand-area">';
+    html += '<div class="my-hand-label">Your Hand</div>';
+    html += '<div class="my-cards">';
+    if (myPlayer && myPlayer.hand) {
+        myPlayer.hand.forEach(card => html += renderMyCard(card));
+    }
+    html += '</div></div>';
+    
+    // Actions
+    html += '<div class="action-area">';
+    const isTurn = myIndex === state.turnIndex;
+    if (isTurn && myPlayer && !myPlayer.folded) {
+        html += `<button class="action-btn btn-fold" onclick="sendAction('fold')">Fold</button>`;
         
-        const myIndex = state.players.findIndex(p => p.id === myPlayerId);
-        const isTurn = myIndex === state.turnIndex;
+        if (state.currentBet === 0 || state.currentBet === myPlayer.bet) {
+            html += `<button class="action-btn btn-call" onclick="sendAction('check')">Check</button>`;
+        } else {
+            const callAmount = state.currentBet - myPlayer.bet;
+            html += `<button class="action-btn btn-call" onclick="sendAction('call')">Call<span class="btn-amount">$${callAmount}</span></button>`;
+        }
         
-        if (isTurn && !myPlayer.folded) {
-            html += '<div id="action-buttons">';
-            html += `<button onclick="sendAction('fold')" style="width:48%; margin:2px;">フォールド</button>`;
-            
-            if (state.currentBet === 0 || state.currentBet === myPlayer.bet) {
-                html += `<button onclick="sendAction('check')" style="width:48%; margin:2px;">チェック</button>`;
-            } else {
-                const callAmount = state.currentBet - myPlayer.bet;
-                html += `<button onclick="sendAction('call')" style="width:48%; margin:2px;">コール(${callAmount})</button>`;
-            }
-            
-            const minTotalBet = state.currentBet === 0 ? state.bb : state.currentBet * 2;
-            const maxTotalBet = myPlayer.bet + myPlayer.chips;
-            
-            if (minTotalBet <= maxTotalBet) {
-                const label = state.currentBet === 0 ? 'ベット' : 'レイズ';
-                
-                html += `<div style="margin:10px 0;">`;
-                html += `<input type="range" id="raise-slider" min="${minTotalBet}" max="${maxTotalBet}" value="${minTotalBet}" step="${state.bb}" style="width:100%;" oninput="updateRaiseDisplay()">`;
-                html += `<div style="text-align:center; font-size:18px; font-weight:bold; margin:5px 0;">`;
-                html += `<span id="raise-display">${minTotalBet}</span> チップ`;
-                html += `</div>`;
-                html += `<button onclick="sendSliderRaise()" style="width:100%; margin:2px; background:#ff9966; font-size:16px; padding:12px;">${label}</button>`;
-                html += `</div>`;
-                
-                html += `<div style="display:flex; gap:5px; margin:5px 0;">`;
-                html += `<button onclick="setRaiseAmount(${minTotalBet})" style="flex:1; padding:8px; font-size:12px;">ミニマム</button>`;
-                
-                const potRaise = state.pot + state.currentBet;
-                if (potRaise > minTotalBet && potRaise <= maxTotalBet) {
-                    html += `<button onclick="setRaiseAmount(${potRaise})" style="flex:1; padding:8px; font-size:12px;">ポット</button>`;
-                }
-                
-                if (maxTotalBet > minTotalBet) {
-                    html += `<button onclick="setRaiseAmount(${maxTotalBet})" style="flex:1; padding:8px; font-size:12px; background:#cc0000;">オールイン</button>`;
-                }
-                html += `</div>`;
-            }
-            
+        const minBet = state.currentBet === 0 ? state.bb : state.currentBet * 2;
+        const maxBet = myPlayer.bet + myPlayer.chips;
+        if (minBet <= maxBet) {
+            html += `<button class="action-btn btn-raise" onclick="sendSliderRaise()">Raise<span class="btn-amount" id="raiseAmount">$${minBet}</span></button>`;
+        }
+    }
+    html += '</div></div>';
+    
+    // Bet Slider
+    if (isTurn && myPlayer && !myPlayer.folded) {
+        const minBet = state.currentBet === 0 ? state.bb : state.currentBet * 2;
+        const maxBet = myPlayer.bet + myPlayer.chips;
+        if (minBet <= maxBet) {
+            html += '<div class="slider-area">';
+            html += '<div class="slider-header">';
+            html += '<span class="slider-label">BET AMOUNT</span>';
+            html += `<span class="slider-value" id="betAmountDisplay">$${minBet}</span>`;
             html += '</div>';
+            html += '<div class="slider-wrapper">';
+            html += '<div class="slider-track"></div>';
+            html += '<div class="slider-fill" id="sliderFill"></div>';
+            html += `<input type="range" class="bet-slider" id="betSlider" min="${minBet}" max="${maxBet}" value="${minBet}" step="${state.bb}">`;
+            html += '</div>';
+            html += '<div class="quick-bets">';
+            html += `<button class="quick-bet-btn" data-bet="${minBet}">MIN</button>`;
+            html += `<button class="quick-bet-btn" data-bet="${Math.floor(state.pot / 2)}">1/2</button>`;
+            html += `<button class="quick-bet-btn" data-bet="${state.pot}">POT</button>`;
+            html += `<button class="quick-bet-btn" data-bet="${maxBet}">ALL-IN</button>`;
+            html += '</div></div>';
         }
     }
     
+    html += '</div>';
     gameArea.innerHTML = html;
+    
+    // Slider event listeners
+    const betSlider = document.getElementById('betSlider');
+    if (betSlider) {
+        betSlider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            document.getElementById('betAmountDisplay').textContent = '$' + value;
+            document.getElementById('raiseAmount').textContent = '$' + value;
+            const percentage = ((value - betSlider.min) / (betSlider.max - betSlider.min)) * 100;
+            document.getElementById('sliderFill').style.width = percentage + '%';
+        });
+        
+        document.querySelectorAll('.quick-bet-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const value = parseInt(btn.dataset.bet);
+                betSlider.value = value;
+                betSlider.dispatchEvent(new Event('input'));
+            });
+        });
+    }
 }
 
 window.sendAction = function(action, amount) {
@@ -683,9 +715,8 @@ window.setRaiseAmount = function(amount) {
 };
 
 window.sendSliderRaise = function() {
-    const slider = document.getElementById('raise-slider');
+    const slider = document.getElementById('betSlider');
     if (!slider) return;
-    
     const amount = parseInt(slider.value);
     sendAction('bet', amount);
 };
