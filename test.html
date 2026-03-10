@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Poker Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(180deg, #0a0e14 0%, #121a24 50%, #0d1318 100%);
+            min-height: 100vh;
+            width: 390px;
+            margin: 0 auto;
+            overflow: hidden;
+            color: white;
+            user-select: none;
+        }
+
+        .game-container {
+            height: 844px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 16px;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 50;
+        }
+
+        .header-btn {
+            width: 32px;
+            height: 32px;
+            background: rgba(255, 255, 255, 0.08);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .header-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.85);
+            letter-spacing: 0.5px;
+        }
+
+        /* Player Count */
+        .player-control {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 5px;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .player-control-label {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .player-count-btns {
+            display: flex;
+            gap: 3px;
+        }
+
+        .count-btn {
+            width: 24px;
+            height: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            color: white;
+            border-radius: 4px;
+            font-size: 10px;
+            cursor: pointer;
+        }
+
+        .count-btn.active {
+            background: rgba(234, 179, 8, 0.25);
+            border-color: #eab308;
+            color: #fde047;
+        }
+
+        /* Table Area */
+        .table-area {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Poker Table */
+        .poker-table {
+            width: 280px;
+            height: 360px;
+            background: radial-gradient(ellipse at center, #1d6b3a 0%, #145228 60%, #0f3d1e 100%);
+            border-radius: 140px;
+            border: 5px solid #5c3d1e;
+            box-shadow: 
+                0 0 0 2px #3d2810,
+                0 10px 40px rgba(0, 0, 0, 0.7),
+                inset 0 0 60px rgba(0, 0, 0, 0.4);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1;
+        }
+
+        /* POT */
+        .pot-display {
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .pot-label {
+            font-size: 8px;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .pot-amount {
+            font-size: 18px;
+            font-weight: bold;
+            color: #fde047;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+        }
+
+        /* Community Cards */
+        .community-cards {
+            display: flex;
+            gap: 2px;
+        }
+
+        .card {
+            width: 22px;
+            height: 32px;
+            background: white;
+            border-radius: 2px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+            font-weight: bold;
+        }
+
+        .card.hidden {
+            background: linear-gradient(135deg, #a81d34 0%, #6b1525 100%);
+        }
+
+        .card-value { font-size: 9px; line-height: 1; }
+        .card-suit { font-size: 10px; line-height: 1; }
+        .card.red { color: #dc2626; }
+        .card.black { color: #1e293b; }
+
+        /* Players Container */
+        .players-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 180px;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        /* ================================ */
+        /* Opponent Style - 大きく見やすく */
+        /* ================================ */
+        .opponent {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: all 0.4s ease;
+            pointer-events: auto;
+            z-index: 10;
+        }
+
+        .opponent-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: rgba(10, 15, 25, 0.95);
+            padding: 8px 14px;
+            border-radius: 10px;
+            border: 1.5px solid rgba(255, 255, 255, 0.15);
+            min-width: 80px;
+            position: relative;
+            backdrop-filter: blur(4px);
+        }
+
+        .opponent-name {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+
+        .opponent-stack {
+            font-size: 14px;
+            color: #4ade80;
+            font-weight: bold;
+        }
+
+        .opponent-action {
+            font-size: 10px;
+            color: #fbbf24;
+            font-weight: 600;
+            margin-top: 2px;
+            padding: 2px 8px;
+            background: rgba(251, 191, 36, 0.15);
+            border-radius: 4px;
+        }
+
+        .opponent-cards {
+            display: flex;
+            gap: 3px;
+            margin-top: 6px;
+        }
+
+        .mini-card {
+            width: 28px;
+            height: 40px;
+            background: linear-gradient(135deg, #a81d34 0%, #6b1525 100%);
+            border-radius: 3px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+        }
+
+        .mini-card.folded { 
+            opacity: 0.25; 
+            transform: rotate(-5deg);
+        }
+
+        .dealer-chip {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 20px;
+            height: 20px;
+            background: linear-gradient(145deg, #fde047, #eab308);
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            font-weight: bold;
+            color: #1a1a2e;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            border: 2px solid #fff;
+        }
+
+        .opponent.is-dealer .dealer-chip { display: flex; }
+
+        .bet-badge {
+            background: linear-gradient(135deg, #fde047, #eab308);
+            color: #1a1a2e;
+            font-size: 11px;
+            font-weight: bold;
+            padding: 3px 10px;
+            border-radius: 12px;
+            margin-top: 5px;
+            display: none;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+
+        .opponent.has-bet .bet-badge { display: block; }
+
+        /* Active turn indicator */
+        .opponent.is-active .opponent-box {
+            border-color: #22c55e;
+            box-shadow: 0 0 15px rgba(34, 197, 94, 0.4);
+        }
+
+        /* ================================ */
+        /* Bottom Area - 3 Column Layout   */
+        /* ================================ */
+        .bottom-area {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 180px;
+            background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.8) 40%, rgba(0,0,0,0.95) 100%);
+            display: grid;
+            grid-template-columns: 100px 1fr 105px;
+            grid-template-rows: 1fr;
+            padding: 15px 10px 25px 10px;
+            gap: 10px;
+            z-index: 20;
+        }
+
+        /* Left Column - Stack */
+        .my-stack-area {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: flex-start;
+        }
+
+        .my-stack-box {
+            background: rgba(15, 23, 42, 0.95);
+            border: 2px solid rgba(74, 222, 128, 0.5);
+            border-radius: 10px;
+            padding: 10px 14px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        .my-stack-label {
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .my-stack-value {
+            font-size: 18px;
+            color: #4ade80;
+            font-weight: bold;
+        }
+
+        /* Center Column - Hand */
+        .my-hand-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .my-hand-label {
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .my-cards {
+            display: flex;
+            gap: 8px;
+        }
+
+        .my-card {
+            width: 52px;
+            height: 74px;
+            background: white;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+            font-weight: bold;
+        }
+
+        .my-card .card-value { font-size: 20px; }
+        .my-card .card-suit { font-size: 24px; }
+        .my-card.red { color: #dc2626; }
+        .my-card.black { color: #1e293b; }
+
+        /* Right Column - Actions */
+        .action-area {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            gap: 6px;
+        }
+
+        .action-btn {
+            padding: 12px 8px;
+            border: none;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: transform 0.1s, filter 0.1s;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+        }
+
+        .action-btn:active {
+            transform: scale(0.96);
+        }
+
+        .btn-fold {
+            background: linear-gradient(145deg, #4b5563, #374151);
+            color: white;
+        }
+
+        .btn-call {
+            background: linear-gradient(145deg, #3b82f6, #2563eb);
+            color: white;
+        }
+
+        .btn-raise {
+            background: linear-gradient(145deg, #f59e0b, #d97706);
+            color: white;
+        }
+
+        .btn-amount {
+            display: block;
+            font-size: 10px;
+            font-weight: normal;
+            margin-top: 2px;
+            opacity: 0.9;
+        }
+
+        /* Bet Slider */
+        .slider-area {
+            position: absolute;
+            bottom: 190px;
+            left: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.85);
+            border-radius: 12px;
+            padding: 12px 14px;
+            z-index: 25;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.4);
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .slider-label {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .slider-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #fde047;
+        }
+
+        .slider-wrapper {
+            position: relative;
+            height: 28px;
+            display: flex;
+            align-items: center;
+        }
+
+        .slider-track {
+            position: absolute;
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 3px;
+        }
+
+        .slider-fill {
+            position: absolute;
+            height: 6px;
+            background: linear-gradient(90deg, #fde047, #eab308);
+            border-radius: 3px;
+        }
+
+        .bet-slider {
+            width: 100%;
+            height: 6px;
+            -webkit-appearance: none;
+            background: transparent;
+            outline: none;
+            position: relative;
+            z-index: 2;
+            cursor: pointer;
+        }
+
+        .bet-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            background: linear-gradient(145deg, #fde047, #eab308);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(253, 224, 71, 0.5);
+        }
+
+        .quick-bets {
+            display: flex;
+            gap: 6px;
+            margin-top: 10px;
+        }
+
+        .quick-bet-btn {
+            flex: 1;
+            padding: 8px 4px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 6px;
+            color: white;
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .quick-bet-btn.active {
+            background: rgba(253, 224, 71, 0.2);
+            border-color: #eab308;
+            color: #fde047;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.8);
+            background: rgba(0, 0, 0, 0.95);
+            color: white;
+            padding: 14px 28px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 100;
+        }
+
+        .toast.show {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <!-- Header -->
+        <div class="header">
+            <button class="header-btn">☰</button>
+            <span class="header-title">TEXAS HOLD'EM</span>
+            <button class="header-btn">⚙</button>
+        </div>
+
+        <!-- Player Count -->
+        <div class="player-control">
+            <span class="player-control-label">Players:</span>
+            <div class="player-count-btns">
+                <button class="count-btn" data-count="2">2</button>
+                <button class="count-btn" data-count="3">3</button>
+                <button class="count-btn" data-count="4">4</button>
+                <button class="count-btn" data-count="5">5</button>
+                <button class="count-btn" data-count="6">6</button>
+                <button class="count-btn" data-count="7">7</button>
+                <button class="count-btn active" data-count="8">8</button>
+            </div>
+        </div>
+
+        <!-- Table Area -->
+        <div class="table-area">
+            <!-- Poker Table -->
+            <div class="poker-table">
+                <div class="pot-display">
+                    <div class="pot-label">Pot</div>
+                    <div class="pot-amount" id="potDisplay">$2,450</div>
+                </div>
+                <div class="community-cards">
+                    <div class="card red">
+                        <span class="card-value">A</span>
+                        <span class="card-suit">♥</span>
+                    </div>
+                    <div class="card black">
+                        <span class="card-value">K</span>
+                        <span class="card-suit">♠</span>
+                    </div>
+                    <div class="card red">
+                        <span class="card-value">10</span>
+                        <span class="card-suit">♦</span>
+                    </div>
+                    <div class="card hidden"></div>
+                    <div class="card hidden"></div>
+                </div>
+            </div>
+
+            <!-- Opponents -->
+            <div class="players-container" id="playersContainer"></div>
+        </div>
+
+        <!-- Bet Slider -->
+        <div class="slider-area">
+            <div class="slider-header">
+                <span class="slider-label">BET AMOUNT</span>
+                <span class="slider-value" id="betAmountDisplay">$500</span>
+            </div>
+            <div class="slider-wrapper">
+                <div class="slider-track"></div>
+                <div class="slider-fill" id="sliderFill"></div>
+                <input type="range" class="bet-slider" id="betSlider" min="50" max="5230" value="500" step="25">
+            </div>
+            <div class="quick-bets">
+                <button class="quick-bet-btn" data-bet="min">MIN</button>
+                <button class="quick-bet-btn" data-bet="half">1/2</button>
+                <button class="quick-bet-btn" data-bet="pot">POT</button>
+                <button class="quick-bet-btn" data-bet="max">ALL-IN</button>
+            </div>
+        </div>
+
+        <!-- Bottom Area -->
+        <div class="bottom-area">
+            <!-- Left: My Stack -->
+            <div class="my-stack-area">
+                <div class="my-stack-box">
+                    <div class="my-stack-label">My Stack</div>
+                    <div class="my-stack-value" id="myStackDisplay">$5,230</div>
+                </div>
+            </div>
+
+            <!-- Center: My Hand -->
+            <div class="my-hand-area">
+                <div class="my-hand-label">Your Hand</div>
+                <div class="my-cards">
+                    <div class="my-card red">
+                        <span class="card-value">A</span>
+                        <span class="card-suit">♦</span>
+                    </div>
+                    <div class="my-card black">
+                        <span class="card-value">K</span>
+                        <span class="card-suit">♣</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Actions -->
+            <div class="action-area">
+                <button class="action-btn btn-fold">Fold</button>
+                <button class="action-btn btn-call">
+                    Call
+                    <span class="btn-amount">$200</span>
+                </button>
+                <button class="action-btn btn-raise">
+                    Raise
+                    <span class="btn-amount" id="raiseAmount">$500</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="toast" id="toast"></div>
+    </div>
+
+    <script>
+        // ============================================
+        // Game State
+        // ============================================
+        const GameState = {
+            pot: 2450,
+            stack: 5230,
+            currentBet: 500,
+            minBet: 50,
+            playerCount: 8,
+            dealerPosition: 2,
+            activePlayer: 0
+        };
+
+        // ============================================
+        // Opponents Data
+        // ============================================
+        const opponents = [
+            { name: 'Alex', stack: 4200, action: 'Raise', hasBet: true, betAmount: 300, folded: false },
+            { name: 'Beth', stack: 6100, action: 'Call', hasBet: true, betAmount: 200, folded: false },
+            { name: 'Chris', stack: 3800, action: 'Fold', hasBet: false, betAmount: 0, folded: true },
+            { name: 'Dana', stack: 5500, action: 'Check', hasBet: false, betAmount: 0, folded: false },
+            { name: 'Erik', stack: 2900, action: 'All-In', hasBet: true, betAmount: 2900, folded: false },
+            { name: 'Fiona', stack: 7200, action: 'Call', hasBet: true, betAmount: 200, folded: false },
+            { name: 'Greg', stack: 4800, action: '', hasBet: false, betAmount: 0, folded: false }
+        ];
+
+        // ============================================
+        // Position Calculator
+        // ============================================
+        function getOpponentPositions(count) {
+            const W = 390;
+            const H = 420;
+            const centerX = W / 2;
+            const centerY = H / 2 - 20;
+            
+            const radiusX = 160;
+            const radiusY = 180;
+            
+            const positions = [];
+            const opponentCount = count - 1;
+            
+            for (let i = 0; i < opponentCount; i++) {
+                const startAngle = 200;
+                const endAngle = 340;
+                const angleRange = endAngle - startAngle;
+                const angle = (startAngle + (angleRange / (opponentCount + 1)) * (i + 1)) * (Math.PI / 180);
+                
+                const x = centerX + radiusX * Math.cos(angle);
+                const y = centerY + radiusY * Math.sin(angle);
+                
+                positions.push({ x, y });
+            }
+            
+            return positions;
+        }
+
+        // ============================================
+        // Render Opponents
+        // ============================================
+        function renderOpponents() {
+            const container = document.getElementById('playersContainer');
+            container.innerHTML = '';
+            
+            const positions = getOpponentPositions(GameState.playerCount);
+            const opponentCount = GameState.playerCount - 1;
+            
+            for (let i = 0; i < opponentCount && i < opponents.length; i++) {
+                const pos = positions[i];
+                const opp = opponents[i];
+                
+                const el = document.createElement('div');
+                el.className = 'opponent';
+                if (i === GameState.dealerPosition) el.classList.add('is-dealer');
+                if (opp.hasBet) el.classList.add('has-bet');
+                if (i === GameState.activePlayer) el.classList.add('is-active');
+                
+                el.style.left = `${pos.x}px`;
+                el.style.top = `${pos.y}px`;
+                el.style.transform = 'translate(-50%, -50%)';
+                
+                el.innerHTML = `
+                    <div class="opponent-box">
+                        <span class="dealer-chip">D</span>
+                        <span class="opponent-name">${opp.name}</span>
+                        <span class="opponent-stack">$${opp.stack.toLocaleString()}</span>
+                        ${opp.action ? `<span class="opponent-action">${opp.action}</span>` : ''}
+                    </div>
+                    <div class="opponent-cards">
+                        <div class="mini-card ${opp.folded ? 'folded' : ''}"></div>
+                        <div class="mini-card ${opp.folded ? 'folded' : ''}"></div>
+                    </div>
+                    <div class="bet-badge">$${opp.betAmount.toLocaleString()}</div>
+                `;
+                
+                container.appendChild(el);
+            }
+        }
+
+        // ============================================
+        // Player Count Change
+        // ============================================
+        document.querySelectorAll('.count-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.count-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                GameState.playerCount = parseInt(btn.dataset.count);
+                if (GameState.dealerPosition >= GameState.playerCount - 1) {
+                    GameState.dealerPosition = 0;
+                }
+                renderOpponents();
+                showToast(`${GameState.playerCount}人`);
+            });
+        });
+
+        // ============================================
+        // Bet Slider
+        // ============================================
+        const betSlider = document.getElementById('betSlider');
+        const betAmountDisplay = document.getElementById('betAmountDisplay');
+        const sliderFill = document.getElementById('sliderFill');
+        const raiseAmount = document.getElementById('raiseAmount');
+
+        function updateSlider(value) {
+            GameState.currentBet = value;
+            betAmountDisplay.textContent = '$' + value.toLocaleString();
+            raiseAmount.textContent = '$' + value.toLocaleString();
+            
+            const percentage = ((value - 50) / (5230 - 50)) * 100;
+            sliderFill.style.width = percentage + '%';
+            
+            document.querySelectorAll('.quick-bet-btn').forEach(btn => btn.classList.remove('active'));
+        }
+
+        betSlider.addEventListener('input', (e) => updateSlider(parseInt(e.target.value)));
+
+        document.querySelectorAll('.quick-bet-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                let value;
+                switch(btn.dataset.bet) {
+                    case 'min': value = 50; break;
+                    case 'half': value = Math.floor(GameState.pot / 2); break;
+                    case 'pot': value = GameState.pot; break;
+                    case 'max': value = GameState.stack; break;
+                }
+                betSlider.value = value;
+                updateSlider(value);
+                btn.classList.add('active');
+            });
+        });
+
+        // ============================================
+        // Action Buttons
+        // ============================================
+        document.querySelectorAll('.action-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const action = btn.classList.contains('btn-fold') ? 'FOLD' :
+                              btn.classList.contains('btn-call') ? 'CALL' : 'RAISE';
+                showToast(action);
+            });
+        });
+
+        // ============================================
+        // Toast
+        // ============================================
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 1500);
+        }
+
+        // Init
+        updateSlider(500);
+        renderOpponents();
+    </script>
+</body>
+</html>

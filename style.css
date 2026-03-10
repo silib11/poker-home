@@ -352,6 +352,31 @@ input[type="range"]::-moz-range-thumb {
     flex-direction: column;
     position: relative;
     overflow: hidden;
+    background: 
+        radial-gradient(ellipse 90vw 55vh at 50% 45%, 
+            rgba(29, 107, 58, 0.9) 0%, 
+            rgba(20, 82, 40, 0.8) 60%, 
+            rgba(15, 61, 30, 0.6) 100%),
+        linear-gradient(180deg, #0a0e14 0%, #121a24 50%, #0d1318 100%);
+}
+
+.game-container::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) translateY(-10%);
+    width: 90vw;
+    height: 55vh;
+    max-width: 500px;
+    border-radius: 50%;
+    border: 5px solid #5c3d1e;
+    box-shadow: 
+        0 0 0 2px #3d2810,
+        0 10px 40px rgba(0, 0, 0, 0.7),
+        inset 0 0 60px rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+    z-index: 0;
 }
 
 /* Table Area */
@@ -361,27 +386,17 @@ input[type="range"]::-moz-range-thumb {
     overflow: hidden;
 }
 
-/* Poker Table */
+/* Poker Table - Center Info Only */
 .poker-table {
-    width: 90vw;
-    height: 55vh;
-    max-width: 500px;
-    background: radial-gradient(ellipse at center, #1d6b3a 0%, #145228 60%, #0f3d1e 100%);
-    border-radius: 50%;
-    border: 5px solid #5c3d1e;
-    box-shadow: 
-        0 0 0 2px #3d2810,
-        0 10px 40px rgba(0, 0, 0, 0.7),
-        inset 0 0 60px rgba(0, 0, 0, 0.4);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
     position: absolute;
     top: 45%;
     left: 50%;
     transform: translate(-50%, -50%);
-    z-index: 1;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 
 /* POT */
