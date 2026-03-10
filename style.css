@@ -8,11 +8,13 @@ body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: linear-gradient(180deg, #0a0e14 0%, #121a24 50%, #0d1318 100%);
     color: #fff;
-    padding: 20px;
+    padding: 0;
     -webkit-user-select: none;
     user-select: none;
-    overflow-x: hidden;
-    min-height: 100vh;
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+    height: 100vh;
 }
 
 body.game-active {
@@ -24,8 +26,16 @@ body.game-active {
 }
 
 #app {
-    max-width: 400px;
-    margin: 0 auto;
+    max-width: 100%;
+    margin: 0;
+    height: 100vh;
+    overflow: hidden;
+}
+
+#setup-screen {
+    padding: 20px;
+    overflow-y: auto;
+    height: 100vh;
 }
 
 #game-screen {
@@ -177,19 +187,11 @@ input {
 }
 
 #players-list {
-    background: #2a2a2a;
-    padding: 15px;
-    border-radius: 8px;
-    margin: 10px 0;
+    display: none;
 }
 
 .player-item {
-    background: #333;
-    padding: 10px;
-    margin: 5px 0;
-    border-radius: 4px;
-    display: flex;
-    justify-content: space-between;
+    display: none;
 }
 
 .blind-badge {
@@ -345,10 +347,11 @@ input[type="range"]::-moz-range-thumb {
 
 /* Game Container */
 .game-container {
-    height: 844px;
+    height: 100vh;
     display: flex;
     flex-direction: column;
     position: relative;
+    overflow: hidden;
 }
 
 /* Table Area */
@@ -360,10 +363,11 @@ input[type="range"]::-moz-range-thumb {
 
 /* Poker Table */
 .poker-table {
-    width: 280px;
-    height: 360px;
+    width: 90vw;
+    height: 55vh;
+    max-width: 500px;
     background: radial-gradient(ellipse at center, #1d6b3a 0%, #145228 60%, #0f3d1e 100%);
-    border-radius: 140px;
+    border-radius: 50%;
     border: 5px solid #5c3d1e;
     box-shadow: 
         0 0 0 2px #3d2810,
@@ -374,7 +378,7 @@ input[type="range"]::-moz-range-thumb {
     align-items: center;
     justify-content: center;
     position: absolute;
-    top: 50%;
+    top: 45%;
     left: 50%;
     transform: translate(-50%, -50%);
     z-index: 1;
@@ -434,7 +438,7 @@ input[type="range"]::-moz-range-thumb {
     top: 0;
     left: 0;
     right: 0;
-    bottom: 180px;
+    bottom: 200px;
     z-index: 10;
     pointer-events: none;
 }
@@ -551,12 +555,12 @@ input[type="range"]::-moz-range-thumb {
     bottom: 0;
     left: 0;
     right: 0;
-    height: 180px;
+    height: 200px;
     background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.8) 40%, rgba(0,0,0,0.95) 100%);
     display: grid;
     grid-template-columns: 100px 1fr 105px;
     grid-template-rows: 1fr;
-    padding: 15px 10px 25px 10px;
+    padding: 15px 10px 30px 10px;
     gap: 10px;
     z-index: 20;
 }
@@ -680,7 +684,7 @@ input[type="range"]::-moz-range-thumb {
 /* Bet Slider */
 .slider-area {
     position: absolute;
-    bottom: 190px;
+    bottom: 210px;
     left: 10px;
     right: 10px;
     background: rgba(0, 0, 0, 0.85);
@@ -773,4 +777,109 @@ input[type="range"]::-moz-range-thumb {
     background: rgba(253, 224, 71, 0.2);
     border-color: #eab308;
     color: #fde047;
+}
+
+/* Ranking Modal */
+.ranking-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 200;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.ranking-modal.show {
+    display: flex;
+}
+
+.ranking-content {
+    background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+    border-radius: 16px;
+    padding: 20px;
+    width: 90%;
+    max-width: 350px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+}
+
+.ranking-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.ranking-title {
+    font-size: 20px;
+    font-weight: bold;
+    color: #fde047;
+}
+
+.ranking-close {
+    width: 32px;
+    height: 32px;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.ranking-item {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 12px 15px;
+    margin: 8px 0;
+    border-radius: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ranking-item:nth-child(1) { border-color: #ffd700; background: rgba(255, 215, 0, 0.1); }
+.ranking-item:nth-child(2) { border-color: #c0c0c0; background: rgba(192, 192, 192, 0.1); }
+.ranking-item:nth-child(3) { border-color: #cd7f32; background: rgba(205, 127, 50, 0.1); }
+
+.ranking-rank {
+    font-size: 16px;
+    font-weight: bold;
+    min-width: 50px;
+}
+
+.ranking-name {
+    flex: 1;
+    font-size: 14px;
+    margin: 0 10px;
+}
+
+.ranking-chips {
+    font-size: 14px;
+    font-weight: bold;
+    color: #4ade80;
+}
+
+/* Ranking Button */
+.ranking-btn {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    width: 40px;
+    height: 40px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }

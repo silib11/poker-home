@@ -281,24 +281,7 @@ function handleMessage(msg) {
 }
 
 function updatePlayersList() {
-    // チップ数で降順ソート
-    const sortedPlayers = [...gameState.players].sort((a, b) => b.chips - a.chips);
-    
-    playersList.innerHTML = `<h3>プレイヤー (${gameState.players.length}人)</h3>`;
-    sortedPlayers.forEach((p, index) => {
-        const div = document.createElement('div');
-        div.className = 'player-item';
-        
-        // 順位表示
-        let rankIcon = '';
-        if (index === 0) rankIcon = '🥇 ';
-        else if (index === 1) rankIcon = '🥈 ';
-        else if (index === 2) rankIcon = '🥉 ';
-        else rankIcon = `${index + 1}位 `;
-        
-        div.innerHTML = `<span>${rankIcon}${p.name}</span><span style="font-weight:bold;">${p.chips} chips</span>`;
-        playersList.appendChild(div);
-    });
+    // ランキングはモーダルで表示するため、この関数は空にする
 }
 
 function handlePlayerAction(data) {
@@ -365,12 +348,12 @@ function renderGame(state) {
     };
     
     const getOpponentPositions = (count) => {
-        const W = 390;
-        const H = 420;
+        const W = window.innerWidth;
+        const H = window.innerHeight - 200;
         const centerX = W / 2;
-        const centerY = H / 2 - 20;
-        const radiusX = 160;
-        const radiusY = 180;
+        const centerY = H * 0.45;
+        const radiusX = W * 0.4;
+        const radiusY = H * 0.35;
         const positions = [];
         const opponentCount = count - 1;
         
@@ -547,6 +530,9 @@ function renderGame(state) {
     // 新しいUI構造
     let html = '<div class="game-container">';
     
+    // Ranking Button
+    html += '<button class="ranking-btn" onclick="toggleRanking()">🏆</button>';
+    
     // Table Area
     html += '<div class="table-area">';
     html += '<div class="poker-table">';
@@ -661,6 +647,32 @@ function renderGame(state) {
     }
     
     html += '</div>';
+    
+    // Ranking Modal
+    html += '<div class="ranking-modal" id="rankingModal" onclick="closeRankingIfOutside(event)">';
+    html += '<div class="ranking-content" onclick="event.stopPropagation()">';
+    html += '<div class="ranking-header">';
+    html += '<span class="ranking-title">🏆 Rankings</span>';
+    html += '<button class="ranking-close" onclick="toggleRanking()">✕</button>';
+    html += '</div>';
+    
+    const sortedPlayers = [...state.players].sort((a, b) => b.chips - a.chips);
+    sortedPlayers.forEach((p, index) => {
+        let rankIcon = '';
+        if (index === 0) rankIcon = '🥇';
+        else if (index === 1) rankIcon = '🥈';
+        else if (index === 2) rankIcon = '🥉';
+        else rankIcon = `${index + 1}位`;
+        
+        html += '<div class="ranking-item">';
+        html += `<span class="ranking-rank">${rankIcon}</span>`;
+        html += `<span class="ranking-name">${p.name}</span>`;
+        html += `<span class="ranking-chips">$${p.chips}</span>`;
+        html += '</div>';
+    });
+    
+    html += '</div></div>';
+    
     gameArea.innerHTML = html;
     
     // Slider event listeners
@@ -825,5 +837,18 @@ window.nextHand = function() {
     console.log('次のハンド開始（旧関数）');
     nextHandReady.clear();
     startNextHand();
+};
+
+window.toggleRanking = function() {
+    const modal = document.getElementById('rankingModal');
+    if (modal) {
+        modal.classList.toggle('show');
+    }
+};
+
+window.closeRankingIfOutside = function(event) {
+    if (event.target.id === 'rankingModal') {
+        toggleRanking();
+    }
 };
 
