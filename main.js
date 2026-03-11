@@ -299,7 +299,11 @@ function renderGame(state) {
     const gameArea = document.getElementById('game-area');
     
     const getCardColor = (suit) => {
-        return (suit === '♥' || suit === '♦') ? 'red' : 'black';
+        if (suit === '♠') return 'black';
+        if (suit === '♥') return 'red';
+        if (suit === '♦') return 'blue';
+        if (suit === '♣') return 'green';
+        return 'black';
     };
     
     const renderCard = (card, isMini = false) => {
@@ -453,7 +457,7 @@ function renderGame(state) {
         
         // コミュニティカード表示
         html += '<h3>ボード</h3>';
-        html += '<div style="margin:15px 0;">';
+        html += '<div style="display:flex; gap:4px; justify-content:center; margin:15px 0;">';
         state.community.forEach(card => {
             html += renderCard(card);
         });
@@ -466,7 +470,7 @@ function renderGame(state) {
                 const isWinner = wonPot !== undefined;
                 html += `<div style="background:${isWinner ? '#1a4d1a' : '#333'}; padding:15px; margin:10px 0; border-radius:8px; border:${isWinner ? '2px solid #ffd700' : 'none'};">`;
                 html += `<div style="font-size:18px; font-weight:bold;">${p.name} ${isWinner ? '👑' : ''}</div>`;
-                html += '<div style="margin:10px 0;">';
+                html += '<div style="display:flex; gap:4px; justify-content:center; margin:10px 0;">';
                 if (p.hand && p.hand.length > 0) {
                     p.hand.forEach(card => html += renderCard(card));
                 }

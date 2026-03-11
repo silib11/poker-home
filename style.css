@@ -52,33 +52,29 @@ body.game-active {
 /* Top Bar */
 #top-bar {
     position: fixed;
-    top: 0;
+    top: env(safe-area-inset-top);
     left: 0;
     right: 0;
     height: 44px;
-    background: rgba(0, 0, 0, 0.85);
-    backdrop-filter: blur(10px);
+    background: transparent;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     padding: 0 12px;
     z-index: 100;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 
 #room-id-info {
-    font-size: 13px;
-    font-weight: 600;
-    color: #fff;
-    flex: 1;
+    display: none;
 }
 
 #host-menu-btn {
-    width: 36px;
-    height: 36px;
-    background: rgba(255, 255, 255, 0.1);
+    width: 44px;
+    height: 44px;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
+    border-radius: 12px;
     color: #fff;
     font-size: 18px;
     display: flex;
@@ -86,10 +82,11 @@ body.game-active {
     justify-content: center;
     padding: 0;
     margin: 0;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 
 #host-menu-btn:active {
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(0, 0, 0, 0.85);
 }
 
 /* Modal */
@@ -243,8 +240,8 @@ input {
 }
 
 #game-area {
-    margin-top: 44px;
-    height: calc(100vh - 44px);
+    margin-top: calc(44px + env(safe-area-inset-top));
+    height: calc(100vh - 44px - env(safe-area-inset-top));
 }
 
 #game-area button {
@@ -472,6 +469,8 @@ input[type="range"]::-moz-range-thumb {
 .card-suit { font-size: 16px; line-height: 1; }
 .card.red { color: #dc2626; }
 .card.black { color: #1e293b; }
+.card.blue { color: #2563eb; }
+.card.green { color: #16a34a; }
 
 /* Players Container */
 .players-container {
@@ -607,7 +606,7 @@ input[type="range"]::-moz-range-thumb {
     display: grid;
     grid-template-columns: 105px 1fr 110px;
     grid-template-rows: 1fr;
-    padding: 15px 10px 35px 10px;
+    padding: 15px 10px calc(35px + env(safe-area-inset-bottom)) 10px;
     gap: 12px;
     z-index: 20;
 }
@@ -680,6 +679,8 @@ input[type="range"]::-moz-range-thumb {
 .my-card .card-suit { font-size: 26px; }
 .my-card.red { color: #dc2626; }
 .my-card.black { color: #1e293b; }
+.my-card.blue { color: #2563eb; }
+.my-card.green { color: #16a34a; }
 
 /* Action Area */
 .action-area {
@@ -732,15 +733,15 @@ input[type="range"]::-moz-range-thumb {
 /* Bet Slider */
 .slider-area {
     position: absolute;
-    bottom: 220px;
-    left: 10px;
+    bottom: calc(15px + env(safe-area-inset-bottom));
     right: 10px;
+    width: 200px;
     background: rgba(0, 0, 0, 0.9);
     backdrop-filter: blur(10px);
     border-radius: 14px;
     padding: 14px 16px;
     z-index: 25;
-    box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
 }
 
 .slider-header {
@@ -808,13 +809,13 @@ input[type="range"]::-moz-range-thumb {
 
 .quick-bets {
     display: flex;
-    gap: 8px;
+    flex-direction: column;
+    gap: 6px;
     margin-top: 12px;
 }
 
 .quick-bet-btn {
-    flex: 1;
-    padding: 10px 6px;
+    padding: 8px 6px;
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 8px;
@@ -924,8 +925,8 @@ input[type="range"]::-moz-range-thumb {
 /* Ranking Button */
 .ranking-btn {
     position: fixed;
-    top: 54px;
-    right: 10px;
+    top: calc(10px + env(safe-area-inset-top));
+    right: 60px;
     width: 44px;
     height: 44px;
     background: rgba(0, 0, 0, 0.7);
