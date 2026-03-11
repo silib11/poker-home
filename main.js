@@ -152,7 +152,6 @@ startGameBtn.addEventListener('click', () => {
     }
     
     hostModal.style.display = 'none';
-    hostControls.style.display = 'block';
     
     // ゲーム中のスクロール無効化
     document.body.classList.add('game-active');
@@ -167,7 +166,6 @@ startGameBtn.addEventListener('click', () => {
     const state = game.getState();
     rtc.broadcast({ type: 'game_start', state });
     renderGame(state);
-    status.textContent = `ゲーム開始 - ${game.phase}`;
 });
 
 function handleMessage(msg) {
@@ -185,7 +183,6 @@ function handleMessage(msg) {
         updatePlayersList();
         rtc.broadcast({ type: 'state', state: gameState });
         rtc.broadcast({ type: 'player_id', playerId, name: data.name });
-        status.textContent = `プレイヤー: ${gameState.players.length}人`;
     }
     
     if (data.type === 'player_id' && data.name === myPlayerName) {
@@ -201,7 +198,6 @@ function handleMessage(msg) {
     if (data.type === 'blinds') {
         gameState.sb = data.sb;
         gameState.bb = data.bb;
-        status.textContent = `ブラインド: ${data.sb}/${data.bb}`;
     }
     
     if (data.type === 'game_start') {
@@ -212,7 +208,6 @@ function handleMessage(msg) {
         gameScreen.classList.add('playing');
         
         renderGame(data.state);
-        status.textContent = `ゲーム開始 - ${data.state.phase}`;
     }
     
     if (data.type === 'game_over') {
@@ -231,7 +226,6 @@ function handleMessage(msg) {
         }
         updatePlayersList();
         renderGame(data.state);
-        status.textContent = `ゲーム再開 - ${data.state.phase}`;
     }
     
     if (data.type === 'ready_next_hand' && isHost) {
@@ -250,9 +244,6 @@ function handleMessage(msg) {
             updatePlayersList();
         }
         renderGame(data.state);
-        const currentBets = data.state.players.reduce((sum, p) => sum + (p.bet || 0), 0);
-        const totalPot = data.state.pot + currentBets;
-        status.textContent = `${data.state.phase} - ポット: ${totalPot}`;
     }
     
     if (data.type === 'action' && isHost) {
@@ -302,9 +293,6 @@ function handlePlayerAction(data) {
     // ホスト自身も更新
     renderGame(newState);
     updatePlayersList();
-    const currentBets = newState.players.reduce((sum, p) => sum + (p.bet || 0), 0);
-    const totalPot = newState.pot + currentBets;
-    status.textContent = `${newState.phase} - ポット: ${totalPot}`;
 }
 
 function renderGame(state) {
@@ -766,7 +754,6 @@ function startNextHand() {
     const state = game.getState();
     rtc.broadcast({ type: 'game_start', state });
     renderGame(state);
-    status.textContent = `新しいハンド - ${game.phase}`;
 }
 
 function showGameOver() {
@@ -789,7 +776,6 @@ function showGameOver() {
     
     html += '</div>';
     gameArea.innerHTML = html;
-    status.textContent = 'ゲーム終了';
     
     rtc.broadcast({ type: 'game_over' });
 }
@@ -810,7 +796,6 @@ window.restartGame = function() {
     rtc.broadcast({ type: 'game_restart', state, buyin: gameState.buyin, allPlayers: gameState.players });
     renderGame(state);
     updatePlayersList();
-    status.textContent = `ゲーム再開 - ${game.phase}`;
 };
 
 window.nextHand = function() {
