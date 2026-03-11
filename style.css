@@ -492,7 +492,7 @@ input[type="range"]::-moz-range-thumb {
     top: 0;
     left: 0;
     right: 0;
-    bottom: 120px;
+    bottom: 140px;
     z-index: 10;
     pointer-events: none;
 }
@@ -615,8 +615,8 @@ input[type="range"]::-moz-range-thumb {
     bottom: 0;
     left: 0;
     right: 0;
-    background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.85) 15%, rgba(0,0,0,0.98) 100%);
-    padding: 8px 8px calc(10px + env(safe-area-inset-bottom)) 8px;
+    background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.85) 10%, rgba(0,0,0,0.98) 100%);
+    padding: 12px 8px calc(10px + env(safe-area-inset-bottom)) 8px;
     z-index: 20;
     display: flex;
     flex-direction: column;
@@ -752,34 +752,32 @@ input[type="range"]::-moz-range-thumb {
 
 /* Bet Slider */
 .slider-area {
-    position: absolute;
-    bottom: calc(15px + env(safe-area-inset-bottom));
-    right: 10px;
-    width: 200px;
-    background: rgba(0, 0, 0, 0.9);
+    position: relative;
+    width: 180px;
+    background: rgba(0, 0, 0, 0.8);
     backdrop-filter: blur(10px);
-    border-radius: 14px;
-    padding: 14px 16px;
-    z-index: 25;
+    border-radius: 12px;
+    padding: 10px 12px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    margin-bottom: 4px;
 }
 
 .slider-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 
 .slider-label {
-    font-size: 11px;
+    font-size: 10px;
     color: rgba(255, 255, 255, 0.6);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
 .slider-value {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: bold;
     color: #fde047;
 }
@@ -829,18 +827,18 @@ input[type="range"]::-moz-range-thumb {
 
 .quick-bets {
     display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin-top: 12px;
+    gap: 4px;
+    margin-top: 8px;
 }
 
 .quick-bet-btn {
-    padding: 8px 6px;
+    flex: 1;
+    padding: 6px 4px;
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 8px;
+    border-radius: 6px;
     color: white;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;

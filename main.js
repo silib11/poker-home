@@ -563,47 +563,9 @@ function renderGame(state) {
     
     // Bottom Area
     html += '<div class="bottom-area">';
-    html += '<div class="bottom-row">';
     
-    // My Stack
-    html += '<div class="my-stack-area"><div class="my-stack-box">';
-    html += '<div class="my-stack-label">Stack</div>';
-    html += `<div class="my-stack-value">$${myPlayer ? myPlayer.chips : 0}</div>`;
-    html += '</div></div>';
-    
-    // My Hand
-    html += '<div class="my-hand-area">';
-    html += '<div class="my-hand-label">Your Hand</div>';
-    html += '<div class="my-cards">';
-    if (myPlayer && myPlayer.hand) {
-        myPlayer.hand.forEach(card => html += renderMyCard(card));
-    }
-    html += '</div></div>';
-    
-    // Actions
-    html += '<div class="action-area">';
+    // Bet Slider (スタックの下に配置)
     const isTurn = myIndex === state.turnIndex;
-    if (isTurn && myPlayer && !myPlayer.folded) {
-        html += `<button class="action-btn btn-fold" onclick="sendAction('fold')">Fold</button>`;
-        
-        if (state.currentBet === 0 || state.currentBet === myPlayer.bet) {
-            html += `<button class="action-btn btn-call" onclick="sendAction('check')">Check</button>`;
-        } else {
-            const callAmount = state.currentBet - myPlayer.bet;
-            html += `<button class="action-btn btn-call" onclick="sendAction('call')">Call<span class="btn-amount">$${callAmount}</span></button>`;
-        }
-        
-        const minBet = state.currentBet === 0 ? state.bb : state.currentBet * 2;
-        const maxBet = myPlayer.bet + myPlayer.chips;
-        if (minBet <= maxBet) {
-            html += `<button class="action-btn btn-raise" onclick="sendSliderRaise()">Raise<span class="btn-amount" id="raiseAmount">$${minBet}</span></button>`;
-        }
-    }
-    html += '</div>';
-    html += '</div>'; // bottom-row
-    html += '</div>'; // bottom-area
-    
-    // Bet Slider
     if (isTurn && myPlayer && !myPlayer.folded) {
         const minBet = state.currentBet === 0 ? state.bb : state.currentBet * 2;
         const maxBet = myPlayer.bet + myPlayer.chips;
@@ -626,6 +588,45 @@ function renderGame(state) {
             html += '</div></div>';
         }
     }
+    
+    html += '<div class="bottom-row">';
+    
+    // My Stack
+    html += '<div class="my-stack-area"><div class="my-stack-box">';
+    html += '<div class="my-stack-label">Stack</div>';
+    html += `<div class="my-stack-value">$${myPlayer ? myPlayer.chips : 0}</div>`;
+    html += '</div></div>';
+    
+    // My Hand
+    html += '<div class="my-hand-area">';
+    html += '<div class="my-hand-label">Your Hand</div>';
+    html += '<div class="my-cards">';
+    if (myPlayer && myPlayer.hand) {
+        myPlayer.hand.forEach(card => html += renderMyCard(card));
+    }
+    html += '</div></div>';
+    
+    // Actions
+    html += '<div class="action-area">';
+    if (isTurn && myPlayer && !myPlayer.folded) {
+        html += `<button class="action-btn btn-fold" onclick="sendAction('fold')">Fold</button>`;
+        
+        if (state.currentBet === 0 || state.currentBet === myPlayer.bet) {
+            html += `<button class="action-btn btn-call" onclick="sendAction('check')">Check</button>`;
+        } else {
+            const callAmount = state.currentBet - myPlayer.bet;
+            html += `<button class="action-btn btn-call" onclick="sendAction('call')">Call<span class="btn-amount">$${callAmount}</span></button>`;
+        }
+        
+        const minBet = state.currentBet === 0 ? state.bb : state.currentBet * 2;
+        const maxBet = myPlayer.bet + myPlayer.chips;
+        if (minBet <= maxBet) {
+            html += `<button class="action-btn btn-raise" onclick="sendSliderRaise()">Raise<span class="btn-amount" id="raiseAmount">$${minBet}</span></button>`;
+        }
+    }
+    html += '</div>';
+    html += '</div>'; // bottom-row
+    html += '</div>'; // bottom-area
     
     html += '</div>';
     
