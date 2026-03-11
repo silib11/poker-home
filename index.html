@@ -37,28 +37,38 @@
         </div>
         
         <div id="game-screen" style="display:none;">
-            <div id="room-id-info"></div>
-            <div id="status">待機中...</div>
-            
-            <!-- Debug Log -->
-            <div id="debug-log" style="background:#1a1a1a; color:#0f0; font-family:monospace; font-size:10px; padding:10px; margin:10px 0; max-height:150px; overflow-y:auto; border:1px solid #333;"></div>
-            
-            <div id="host-controls" style="display:none;">
-                <button id="toggle-host-menu" style="width:100%; background:#555; margin:5px 0;">⚙️ ホストメニュー</button>
-                <div id="host-menu" style="display:none; background:#2a2a2a; padding:10px; border-radius:8px; margin:10px 0;">
-                    <h3 style="margin:10px 0;">ゲームコントロール</h3>
-                    <button id="start-game">ゲーム開始</button>
-                    
-                    <button id="toggle-blinds" style="background:#666; margin-top:10px;">ブラインド変更</button>
-                    <div id="blinds-control" style="display:none; margin:10px 0; padding:10px; background:#1a1a1a; border-radius:8px;">
-                        <label>SB: <input type="number" id="sb-control" min="5" step="5" style="width:80px;"></label>
-                        <label>BB: <input type="number" id="bb-control" min="10" step="10" style="width:80px;"></label>
-                        <button id="update-blinds">更新</button>
-                    </div>
-                </div>
+            <div id="top-bar">
+                <div id="room-id-info"></div>
+                <button id="host-menu-btn" style="display:none;">⚙️</button>
             </div>
             
             <div id="game-area"></div>
+            
+            <!-- Host Menu Modal -->
+            <div id="host-modal" class="modal" style="display:none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>ホストメニュー</h3>
+                        <button id="close-host-modal" class="close-btn">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <button id="start-game" class="modal-btn">ゲーム開始</button>
+                        
+                        <div class="blinds-section">
+                            <h4>ブラインド設定</h4>
+                            <div class="input-group">
+                                <label>SB</label>
+                                <input type="number" id="sb-control" min="5" step="5">
+                            </div>
+                            <div class="input-group">
+                                <label>BB</label>
+                                <input type="number" id="bb-control" min="10" step="10">
+                            </div>
+                            <button id="update-blinds" class="modal-btn">更新</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     

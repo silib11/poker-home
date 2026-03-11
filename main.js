@@ -3,7 +3,6 @@ import { PokerGame } from './poker.js';
 
 const setupScreen = document.getElementById('setup-screen');
 const gameScreen = document.getElementById('game-screen');
-const status = document.getElementById('status');
 const roomIdInfo = document.getElementById('room-id-info');
 const createBtn = document.getElementById('create-room');
 const joinBtn = document.getElementById('join-room');
@@ -13,12 +12,13 @@ const roomIdInput = document.getElementById('room-id-input');
 const buyinInput = document.getElementById('buyin-input');
 const sbInput = document.getElementById('sb-input');
 const bbInput = document.getElementById('bb-input');
-const hostControls = document.getElementById('host-controls');
+const hostMenuBtn = document.getElementById('host-menu-btn');
+const hostModal = document.getElementById('host-modal');
+const closeHostModal = document.getElementById('close-host-modal');
 const sbControl = document.getElementById('sb-control');
 const bbControl = document.getElementById('bb-control');
 const updateBlindsBtn = document.getElementById('update-blinds');
 const startGameBtn = document.getElementById('start-game');
-const playersList = document.getElementById('players-list');
 
 let rtc;
 let isHost = false;
@@ -52,13 +52,11 @@ createBtn.addEventListener('click', async () => {
     gameState.sb = sb;
     gameState.bb = bb;
     
-    status.textContent = 'ルーム作成中...';
     rtc = new WebRTCManager(true);
     
-    rtc.onStatusChange = (s) => status.textContent = s;
     rtc.onMessage = handleMessage;
     rtc.onConnected = () => {
-        status.textContent = `接続: ${gameState.players.length}人`;
+        updateRoomInfo();
     };
     
     try {
@@ -77,17 +75,16 @@ createBtn.addEventListener('click', async () => {
         
         setupScreen.style.display = 'none';
         gameScreen.style.display = 'block';
-        hostControls.style.display = 'block';
+        hostMenuBtn.style.display = 'block';
         
-        roomIdInfo.textContent = `ルームID: ${currentRoomId}`;
+        updateRoomInfo();
         sbControl.value = gameState.sb;
         bbControl.value = gameState.bb;
         
         updatePlayersList();
-        status.textContent = `ルーム作成完了 - プレイヤー待機中`;
     } catch (err) {
         console.error('ルーム作成エラー:', err);
-        status.textContent = 'エラー: ' + err.message;
+        alert('ルーム作成に失敗しました');
     }
 });
 
@@ -107,61 +104,45 @@ joinBtn.addEventListener('click', async () => {
     
     myPlayerName = name;
     currentRoomId = roomId;
-    status.textContent = '接続中...';
     rtc = new WebRTCManager(false);
     
-    rtc.onStatusChange = (s) => status.textContent = s;
     rtc.onMessage = handleMessage;
     rtc.onConnected = () => {
         rtc.send({ type: 'join', name });
-        status.textContent = '接続完了';
     };
     
     await rtc.joinRoom(roomId);
     
     setupScreen.style.display = 'none';
     gameScreen.style.display = 'block';
-    roomIdInfo.textContent = `ルームID: ${roomId}`;
+    updateRoomInfo();
+});
+
+// ホストメニュー
+hostMenuBtn.addEventListener('click', () => {
+    hostModal.style.display = 'flex';
+});
+
+closeHostModal.addEventListener('click', () => {
+    hostModal.style.display = 'none';
+});
+
+hostModal.addEventListener('click', (e) => {
+    if (e.target === hostModal) {
+        hostModal.style.display = 'none';
+    }
 });
 
 updateBlindsBtn.addEventListener('click', () => {
     gameState.sb = parseInt(sbControl.value);
     gameState.bb = parseInt(bbControl.value);
     rtc.broadcast({ type: 'blinds', sb: gameState.sb, bb: gameState.bb });
-    status.textContent = `ブラインド更新: ${gameState.sb}/${gameState.bb}`;
+    hostModal.style.display = 'none';
 });
 
-// ホストメニュートグル
-const toggleHostMenuBtn = document.getElementById('toggle-host-menu');
-const hostMenu = document.getElementById('host-menu');
-const toggleBlindsBtn = document.getElementById('toggle-blinds');
-const blindsControl = document.getElementById('blinds-control');
-
-if (toggleHostMenuBtn) {
-    toggleHostMenuBtn.addEventListener('click', () => {
-        if (hostMenu.style.display === 'none') {
-            hostMenu.style.display = 'block';
-            toggleHostMenuBtn.textContent = '⚙️ メニューを閉じる';
-        } else {
-            hostMenu.style.display = 'none';
-            toggleHostMenuBtn.textContent = '⚙️ ホストメニュー';
-            // メニューを閉じたらブラインドコントロールも閉じる
-            blindsControl.style.display = 'none';
-            toggleBlindsBtn.textContent = 'ブラインド変更';
-        }
-    });
-}
-
-if (toggleBlindsBtn) {
-    toggleBlindsBtn.addEventListener('click', () => {
-        if (blindsControl.style.display === 'none') {
-            blindsControl.style.display = 'block';
-            toggleBlindsBtn.textContent = '閉じる';
-        } else {
-            blindsControl.style.display = 'none';
-            toggleBlindsBtn.textContent = 'ブラインド変更';
-        }
-    });
+function updateRoomInfo() {
+    const playerCount = gameState.players.length;
+    roomIdInfo.textContent = `ルームID: ${currentRoomId} | ${playerCount}人`;
 }
 
 startGameBtn.addEventListener('click', () => {
@@ -170,8 +151,7 @@ startGameBtn.addEventListener('click', () => {
         return;
     }
     
-    setupScreen.style.display = 'none';
-    gameScreen.style.display = 'block';
+    hostModal.style.display = 'none';
     hostControls.style.display = 'block';
     
     // ゲーム中のスクロール無効化
@@ -281,7 +261,7 @@ function handleMessage(msg) {
 }
 
 function updatePlayersList() {
-    // ランキングはモーダルで表示するため、この関数は空にする
+    updateRoomInfo();
 }
 
 function handlePlayerAction(data) {
