@@ -56,15 +56,29 @@ body.game-active {
     left: 0;
     right: 0;
     height: 44px;
-    background: transparent;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(10px);
     display: flex;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: space-between;
     padding: 0 12px;
     z-index: 100;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+#top-bar.game-started {
+    background: transparent;
+    box-shadow: none;
 }
 
 #room-id-info {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    flex: 1;
+}
+
+#room-id-info.hidden {
     display: none;
 }
 
@@ -478,7 +492,7 @@ input[type="range"]::-moz-range-thumb {
     top: 0;
     left: 0;
     right: 0;
-    bottom: 150px;
+    bottom: 120px;
     z-index: 10;
     pointer-events: none;
 }
@@ -597,18 +611,23 @@ input[type="range"]::-moz-range-thumb {
 
 /* Bottom Area */
 .bottom-area {
-    position: absolute;
+    position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
-    height: auto;
-    background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.8) 20%, rgba(0,0,0,0.95) 100%);
-    display: grid;
-    grid-template-columns: 90px 1fr 95px;
-    grid-template-rows: 1fr;
-    padding: 10px 8px calc(15px + env(safe-area-inset-bottom)) 8px;
-    gap: 8px;
+    background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.85) 15%, rgba(0,0,0,0.98) 100%);
+    padding: 8px 8px calc(10px + env(safe-area-inset-bottom)) 8px;
     z-index: 20;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.bottom-row {
+    display: grid;
+    grid-template-columns: 85px 1fr 90px;
+    gap: 8px;
+    align-items: end;
 }
 
 /* My Stack */
@@ -622,13 +641,13 @@ input[type="range"]::-moz-range-thumb {
 .my-stack-box {
     background: rgba(15, 23, 42, 0.95);
     border: 2px solid rgba(74, 222, 128, 0.5);
-    border-radius: 10px;
-    padding: 8px 12px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    border-radius: 8px;
+    padding: 6px 10px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.4);
 }
 
 .my-stack-label {
-    font-size: 9px;
+    font-size: 8px;
     color: rgba(255, 255, 255, 0.6);
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -636,7 +655,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .my-stack-value {
-    font-size: 16px;
+    font-size: 14px;
     color: #4ade80;
     font-weight: bold;
 }
@@ -650,33 +669,33 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .my-hand-label {
-    font-size: 8px;
+    font-size: 7px;
     color: rgba(255, 255, 255, 0.4);
     text-transform: uppercase;
     letter-spacing: 1px;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
 }
 
 .my-cards {
     display: flex;
-    gap: 6px;
+    gap: 5px;
 }
 
 .my-card {
-    width: 48px;
-    height: 68px;
+    width: 42px;
+    height: 60px;
     background: white;
-    border-radius: 6px;
+    border-radius: 5px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7);
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.7);
     font-weight: bold;
 }
 
-.my-card .card-value { font-size: 18px; }
-.my-card .card-suit { font-size: 22px; }
+.my-card .card-value { font-size: 16px; }
+.my-card .card-suit { font-size: 20px; }
 .my-card.red { color: #dc2626; }
 .my-card.black { color: #1e293b; }
 .my-card.blue { color: #2563eb; }
@@ -687,20 +706,21 @@ input[type="range"]::-moz-range-thumb {
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
-    gap: 5px;
+    gap: 4px;
 }
 
 .action-btn {
-    padding: 10px 8px;
+    padding: 8px 6px;
     border: none;
     border-radius: 8px;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: bold;
     cursor: pointer;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    transition: transform 0.1s, filter 0.1s;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.4);
+    letter-spacing: 0.3px;
+    transition: transform 0.1s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    white-space: nowrap;
 }
 
 .action-btn:active {
@@ -724,9 +744,9 @@ input[type="range"]::-moz-range-thumb {
 
 .btn-amount {
     display: block;
-    font-size: 10px;
+    font-size: 9px;
     font-weight: normal;
-    margin-top: 2px;
+    margin-top: 1px;
     opacity: 0.95;
 }
 

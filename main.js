@@ -297,6 +297,12 @@ function handlePlayerAction(data) {
 
 function renderGame(state) {
     const gameArea = document.getElementById('game-area');
+    const topBar = document.getElementById('top-bar');
+    const roomIdInfo = document.getElementById('room-id-info');
+    
+    // ゲーム開始後はルームID非表示、トップバー透明化
+    topBar.classList.add('game-started');
+    roomIdInfo.classList.add('hidden');
     
     const getCardColor = (suit) => {
         if (suit === '♠') return 'black';
@@ -557,10 +563,11 @@ function renderGame(state) {
     
     // Bottom Area
     html += '<div class="bottom-area">';
+    html += '<div class="bottom-row">';
     
     // My Stack
     html += '<div class="my-stack-area"><div class="my-stack-box">';
-    html += '<div class="my-stack-label">My Stack</div>';
+    html += '<div class="my-stack-label">Stack</div>';
     html += `<div class="my-stack-value">$${myPlayer ? myPlayer.chips : 0}</div>`;
     html += '</div></div>';
     
@@ -592,7 +599,9 @@ function renderGame(state) {
             html += `<button class="action-btn btn-raise" onclick="sendSliderRaise()">Raise<span class="btn-amount" id="raiseAmount">$${minBet}</span></button>`;
         }
     }
-    html += '</div></div>';
+    html += '</div>';
+    html += '</div>'; // bottom-row
+    html += '</div>'; // bottom-area
     
     // Bet Slider
     if (isTurn && myPlayer && !myPlayer.folded) {
