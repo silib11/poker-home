@@ -274,7 +274,10 @@ function handlePlayerAction(data) {
     } else if (data.action === 'call') {
         game.call(playerIndex);
     } else if (data.action === 'bet') {
-        game.bet(playerIndex, parseInt(data.amount));
+        // amountは「追加で出す額」なので、現在のベット額に加算して総ベット額にする
+        const player = game.players[playerIndex];
+        const totalBet = player.bet + parseInt(data.amount);
+        game.bet(playerIndex, totalBet);
     }
     
     const newState = game.getState();
@@ -567,24 +570,31 @@ function renderGame(state) {
     // Bet Slider (スタックの下に配置)
     const isTurn = myIndex === state.turnIndex;
     if (isTurn && myPlayer && !myPlayer.folded) {
-        const minBet = state.currentBet === 0 ? state.bb : state.currentBet * 2;
-        const maxBet = myPlayer.bet + myPlayer.chips;
-        if (minBet <= maxBet) {
+        // 最小レイズ額の計算
+        const minRaise = state.currentBet === 0 ? state.bb : state.currentBet;
+        const minTotalBet = state.currentBet + minRaise; // テーブル上の総ベット額
+        const minBetAmount = minTotalBet - myPlayer.bet; // 自分が追加で出す額
+        const maxBetAmount = myPlayer.chips; // 残りチップ
+        
+        if (minBetAmount <= maxBetAmount) {
             html += '<div class="slider-area">';
             html += '<div class="slider-header">';
             html += '<span class="slider-label">BET AMOUNT</span>';
-            html += `<span class="slider-value" id="betAmountDisplay">$${minBet}</span>`;
+            html += `<span class="slider-value" id="betAmountDisplay">$${minBetAmount}</span>`;
             html += '</div>';
             html += '<div class="slider-wrapper">';
             html += '<div class="slider-track"></div>';
             html += '<div class="slider-fill" id="sliderFill"></div>';
-            html += `<input type="range" class="bet-slider" id="betSlider" min="${minBet}" max="${maxBet}" value="${minBet}" step="${state.bb}">`;
+            html += `<input type="range" class="bet-slider" id="betSlider" min="${minBetAmount}" max="${maxBetAmount}" value="${minBetAmount}" step="${state.bb}">`;
             html += '</div>';
             html += '<div class="quick-bets">';
-            html += `<button class="quick-bet-btn" data-bet="${minBet}">MIN</button>`;
-            html += `<button class="quick-bet-btn" data-bet="${Math.floor(state.pot / 2)}">1/2</button>`;
-            html += `<button class="quick-bet-btn" data-bet="${state.pot}">POT</button>`;
-            html += `<button class="quick-bet-btn" data-bet="${maxBet}">ALL-IN</button>`;
+            html += `<button class="quick-bet-btn" data-bet="${minBetAmount}">MIN</button>`;
+            
+            const halfPot = Math.max(minBetAmount, Math.floor((state.pot + state.currentBet) / 2));
+            const fullPot = Math.max(minBetAmount, state.pot + state.currentBet);
+            html += `<button class="quick-bet-btn" data-bet="${Math.min(halfPot, maxBetAmount)}">1/2</button>`;
+            html += `<button class="quick-bet-btn" data-bet="${Math.min(fullPot, maxBetAmount)}">POT</button>`;
+            html += `<button class="quick-bet-btn" data-bet="${maxBetAmount}">ALL-IN</button>`;
             html += '</div></div>';
         }
     }
@@ -611,17 +621,23 @@ function renderGame(state) {
     if (isTurn && myPlayer && !myPlayer.folded) {
         html += `<button class="action-btn btn-fold" onclick="sendAction('fold')">Fold</button>`;
         
-        if (state.currentBet === 0 || state.currentBet === myPlayer.bet) {
+        const isCheck = state.currentBet === 0 || state.currentBet === myPlayer.bet;
+        if (isCheck) {
             html += `<button class="action-btn btn-call" onclick="sendAction('check')">Check</button>`;
         } else {
             const callAmount = state.currentBet - myPlayer.bet;
             html += `<button class="action-btn btn-call" onclick="sendAction('call')">Call<span class="btn-amount">$${callAmount}</span></button>`;
         }
         
-        const minBet = state.currentBet === 0 ? state.bb : state.currentBet * 2;
-        const maxBet = myPlayer.bet + myPlayer.chips;
-        if (minBet <= maxBet) {
-            html += `<button class="action-btn btn-raise" onclick="sendSliderRaise()">Raise<span class="btn-amount" id="raiseAmount">$${minBet}</span></button>`;
+        // 最小レイズ額の計算: 現在のベット額 + (前回のレイズ額 or BB)
+        const minRaise = state.currentBet === 0 ? state.bb : state.currentBet;
+        const minBet = state.currentBet + minRaise;
+        const totalBetNeeded = minBet - myPlayer.bet; // 自分が追加で出す必要がある額
+        const maxBet = myPlayer.chips; // 残りチップ
+        
+        if (totalBetNeeded <= maxBet) {
+            const buttonText = state.currentBet === 0 ? 'Bet' : 'Raise';
+            html += `<button class="action-btn btn-raise" onclick="sendSliderRaise()">${buttonText}<span class="btn-amount" id="raiseAmount">$${totalBetNeeded}</span></button>`;
         }
     }
     html += '</div>';
