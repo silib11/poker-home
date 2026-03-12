@@ -502,7 +502,7 @@ input[type="range"]::-moz-range-thumb {
     align-items: center;
     transition: all 0.3s ease;
     pointer-events: auto;
-    z-index: 10;
+    z-index: 150;
     transform: translate(-50%, -50%);
 }
 
