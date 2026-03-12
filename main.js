@@ -607,6 +607,9 @@ function renderGame(state) {
     html += '<div class="my-stack-area"><div class="my-stack-box">';
     html += '<div class="my-stack-label">Stack</div>';
     html += `<div class="my-stack-value">$${myPlayer ? myPlayer.chips : 0}</div>`;
+    if (myPlayer && myPlayer.bet > 0) {
+        html += `<div class="my-bet-amount">Bet: $${myPlayer.bet}</div>`;
+    }
     html += '</div></div>';
     
     // My Hand
