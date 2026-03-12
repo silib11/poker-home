@@ -391,7 +391,8 @@ function renderGame(state) {
     
     // WINNER時の処理（フォールドで勝利、手札非公開）
     if (state.phase === 'WINNER') {
-        let html = '<div style="text-align:center; margin:20px 0;">';
+        document.getElementById('top-bar').classList.add('game-started');
+        let html = '<div style="text-align:center; margin:20px 0; padding-bottom:40px;">';
         html += '<h2>🏆 勝者決定 🏆</h2>';
         html += `<div style="font-size:28px; font-weight:bold; color:#ffd700; margin:20px 0;">${state.winner.name}</div>`;
         html += `<div style="font-size:20px; margin:10px 0;">獲得: <span style="color:#00ff00; font-weight:bold;">+${state.winAmount}</span> チップ</div>`;
@@ -402,7 +403,7 @@ function renderGame(state) {
         const totalPlayers = state.players.filter(p => p.chips > 0).length;
         const isReady = state.nextHandReady && state.nextHandReady.includes(myPlayerId);
         
-        html += `<div style="margin:20px 0;">`;
+        html += `<div style="margin:40px 0;">`;
         html += `<div style="font-size:14px; color:#aaa; margin:10px 0;">準備完了: ${readyCount}/${totalPlayers}</div>`;
         if (isReady) {
             html += `<button disabled style="width:80%; padding:20px; font-size:18px; background:#555; color:#aaa;">準備完了 ✓</button>`;
@@ -418,7 +419,8 @@ function renderGame(state) {
     
     // SHOWDOWN時の処理
     if (state.phase === 'SHOWDOWN') {
-        let html = '<div style="text-align:center; margin:20px 0;">';
+        document.getElementById('top-bar').classList.add('game-started');
+        let html = '<div style="text-align:center; margin:20px 0; padding-bottom:40px;">';
         html += '<h2>🏆 ショウダウン 🏆</h2>';
         
         // サイドポット結果表示
@@ -494,7 +496,7 @@ function renderGame(state) {
         const totalPlayers = state.players.filter(p => p.chips > 0).length;
         const isReady = state.nextHandReady && state.nextHandReady.includes(myPlayerId);
         
-        html += `<div style="margin:20px 0;">`;
+        html += `<div style="margin:40px 0;">`;
         html += `<div style="font-size:14px; color:#aaa; margin:10px 0;">準備完了: ${readyCount}/${totalPlayers}</div>`;
         if (isReady) {
             html += `<button disabled style="width:80%; padding:20px; font-size:18px; background:#555; color:#aaa;">準備完了 ✓</button>`;

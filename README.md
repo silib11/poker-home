@@ -26,7 +26,13 @@
 - Firebase Realtime Database（シグナリングのみ）
 
 ### ホスティング
-- GitHub Pages（HTTPS / 無料）
+- Vercel（HTTPS / 無料）
+- Serverless Functions（TURN認証情報管理）
+
+### セキュリティ
+- TURN認証情報は環境変数で管理
+- クライアントに直接埋め込まない
+- Serverless Functionで動的に取得
 
 ---
 

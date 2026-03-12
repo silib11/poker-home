@@ -21,6 +21,32 @@ export class WebRTCManager {
         this.onMessage = null;
         this.onConnected = null;
         this.onStatusChange = null;
+        this.iceServers = null;
+    }
+
+    async getIceServers() {
+        if (this.iceServers) {
+            return this.iceServers;
+        }
+        
+        try {
+            // Vercel Serverless Functionから取得
+            const response = await fetch('/api/turn-credentials');
+            if (!response.ok) {
+                throw new Error('Failed to fetch TURN credentials');
+            }
+            const data = await response.json();
+            this.iceServers = data.iceServers;
+            return this.iceServers;
+        } catch (error) {
+            console.error('TURN credentials fetch error:', error);
+            // フォールバック: STUNのみ
+            this.iceServers = [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ];
+            return this.iceServers;
+        }
     }
 
     async createRoom() {
@@ -48,13 +74,8 @@ export class WebRTCManager {
     }
 
     async connectToPlayer(roomId, playerId) {
-        const pc = new RTCPeerConnection({
-            iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:stun2.l.google.com:19302' }
-            ]
-        });
+        const iceServers = await this.getIceServers();
+        const pc = new RTCPeerConnection({ iceServers });
 
         const dataChannel = pc.createDataChannel('poker');
         const conn = { id: playerId, pc, dataChannel };
@@ -118,13 +139,8 @@ export class WebRTCManager {
         console.log(`[Player ${playerId}] ルーム参加: ${roomId}`);
         await set(ref(db, `rooms/${roomId}/players/${playerId}`), true);
 
-        const pc = new RTCPeerConnection({
-            iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:stun2.l.google.com:19302' }
-            ]
-        });
+        const iceServers = await this.getIceServers();
+        const pc = new RTCPeerConnection({ iceServers });
 
         pc.ondatachannel = (e) => {
             console.log(`[Player ${playerId}] DataChannel受信`);

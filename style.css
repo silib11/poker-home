@@ -11,17 +11,15 @@ body {
     padding: 0;
     -webkit-user-select: none;
     user-select: none;
-    overflow: hidden;
-    position: fixed;
+    overflow-y: auto;
     width: 100%;
-    height: 100vh;
+    min-height: 100vh;
 }
 
 body.game-active {
-    overflow: hidden;
-    position: fixed;
+    overflow-y: auto;
     width: 100%;
-    height: 100vh;
+    min-height: 100vh;
     padding: 0;
 }
 
@@ -39,14 +37,14 @@ body.game-active {
 }
 
 #game-screen {
-    height: 100vh;
-    overflow: hidden;
+    min-height: 100vh;
+    overflow-y: auto;
     padding: 0;
     position: relative;
 }
 
 #game-screen.playing {
-    overflow: hidden;
+    overflow-y: auto;
 }
 
 /* Top Bar */

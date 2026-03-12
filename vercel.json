@@ -1,5 +1,20 @@
 {
-  "buildCommand": null,
-  "outputDirectory": ".",
-  "framework": null
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    }
+  ],
+  "env": {
+    "TURN_SERVER_URL": "@turn-server-url",
+    "TURN_USERNAME": "@turn-username",
+    "TURN_CREDENTIAL": "@turn-credential"
+  }
 }
