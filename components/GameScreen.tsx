@@ -1,0 +1,212 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useGame } from '@/context/GameContext';
+import { getOpponentPositions } from '@/lib/playerPositions';
+import CommunityCards from './CommunityCards';
+import PlayerSeat from './PlayerSeat';
+import ActionPanel from './ActionPanel';
+import RankingModal from './RankingModal';
+import WinnerView from './WinnerView';
+
+function useWindowSize() {
+  const [size, setSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    function update() {
+      setSize({ width: window.innerWidth, height: window.innerHeight });
+    }
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  return size;
+}
+
+export default function GameScreen() {
+  const { pokerState, myPlayerId, isHost, currentRoomId, sb, bb, updateBlinds } =
+    useGame();
+  const [showRanking, setShowRanking] = useState(false);
+  const [showHostMenu, setShowHostMenu] = useState(false);
+  const [sbInput, setSbInput] = useState(sb);
+  const [bbInput, setBbInput] = useState(bb);
+  const { width, height } = useWindowSize();
+
+  if (!pokerState) return null;
+
+  const state = pokerState;
+  const myIndex = state.players.findIndex((p) => p.id === myPlayerId);
+  const myPlayer = myIndex >= 0 ? state.players[myIndex] : undefined;
+
+  // WINNER / SHOWDOWN フェーズは専用ビューを表示
+  if (state.phase === 'WINNER' || state.phase === 'SHOWDOWN') {
+    return (
+      <div id="game-screen" className="playing">
+        <div id="game-area" style={{ marginTop: 0, height: 'auto' }}>
+          <WinnerView state={state} />
+        </div>
+      </div>
+    );
+  }
+
+  const positions =
+    width > 0
+      ? getOpponentPositions(state.players.length, width, height)
+      : [];
+
+  function handleUpdateBlinds() {
+    updateBlinds(sbInput, bbInput);
+    setShowHostMenu(false);
+  }
+
+  return (
+    <div id="game-screen" className="playing">
+      <div id="top-bar" className="game-started" />
+
+      <div id="game-area">
+        <div className="game-container">
+          <div className="table-area">
+            {/* テーブル中央: ポット + コミュニティカード */}
+            <CommunityCards
+              community={state.community}
+              pot={state.pot}
+            />
+
+            {/* 相手プレイヤー */}
+            <div className="players-container">
+              {state.players.map((player, index) => {
+                if (player.id === myPlayerId) return null;
+
+                const opponentIndex =
+                  index > myIndex ? index - 1 : index;
+                if (opponentIndex >= positions.length) return null;
+
+                const position = positions[opponentIndex];
+                return (
+                  <PlayerSeat
+                    key={player.id}
+                    player={player}
+                    isActive={index === state.turnIndex}
+                    isDealer={index === state.dealerIndex}
+                    x={position.x}
+                    y={position.y}
+                  />
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 自分のエリア（スタック + 手札 + アクション） */}
+          <ActionPanel
+            state={state}
+            myPlayer={myPlayer}
+            myIndex={myIndex}
+            onToggleRanking={() => setShowRanking((v) => !v)}
+          />
+
+          {/* ランキングモーダル */}
+          {showRanking && (
+            <RankingModal
+              players={state.players}
+              onClose={() => setShowRanking(false)}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* ホストメニューボタン（ゲーム中） */}
+      {isHost && (
+        <button
+          style={{
+            position: 'fixed',
+            top: '10px',
+            left: '10px',
+            width: '44px',
+            height: '44px',
+            background: 'rgba(0,0,0,0.7)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: '12px',
+            color: '#fff',
+            fontSize: '18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+          }}
+          onClick={() => setShowHostMenu(true)}
+        >
+          ⚙️
+        </button>
+      )}
+
+      {/* ルームID */}
+      {currentRoomId && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '14px',
+            left: isHost ? '64px' : '12px',
+            fontSize: '12px',
+            color: 'rgba(255,255,255,0.6)',
+            zIndex: 100,
+          }}
+        >
+          Room: {currentRoomId}
+        </div>
+      )}
+
+      {/* ホストメニューモーダル（ゲーム中） */}
+      {showHostMenu && (
+        <div
+          className="modal"
+          style={{ display: 'flex' }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowHostMenu(false);
+          }}
+        >
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3>ホストメニュー</h3>
+              <button
+                className="close-btn"
+                onClick={() => setShowHostMenu(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="blinds-section">
+                <h4>ブラインド設定</h4>
+                <div className="input-group">
+                  <label>SB</label>
+                  <input
+                    type="number"
+                    value={sbInput}
+                    min={5}
+                    step={5}
+                    onChange={(e) => setSbInput(Number(e.target.value))}
+                  />
+                </div>
+                <div className="input-group">
+                  <label>BB</label>
+                  <input
+                    type="number"
+                    value={bbInput}
+                    min={10}
+                    step={10}
+                    onChange={(e) => setBbInput(Number(e.target.value))}
+                  />
+                </div>
+                <button className="modal-btn" onClick={handleUpdateBlinds}>
+                  更新
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

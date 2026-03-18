@@ -3,10 +3,25 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
     "test": "node tests/poker.test.js && node tests/ui.test.js && node tests/allin.test.js && node tests/allin-4players.test.js",
     "test:poker": "node tests/poker.test.js",
     "test:ui": "node tests/ui.test.js",
     "test:allin": "node tests/allin.test.js",
     "test:allin4": "node tests/allin-4players.test.js"
+  },
+  "dependencies": {
+    "firebase": "^12.10.0",
+    "next": "^16.1.7",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^5.9.3"
   }
 }
