@@ -25,12 +25,13 @@ function useWindowSize() {
 }
 
 export default function GameScreen() {
-  const { pokerState, myPlayerId, isHost, currentRoomId, sb, bb, updateBlinds } =
+  const { pokerState, myPlayerId, isHost, currentRoomId, sb, bb, updateBlinds, leaveGame, requestReentry, buyin } =
     useGame();
   const [showRanking, setShowRanking] = useState(false);
   const [showHostMenu, setShowHostMenu] = useState(false);
   const [sbInput, setSbInput] = useState(sb);
   const [bbInput, setBbInput] = useState(bb);
+  const [leaving, setLeaving] = useState(false);
   const { width, height } = useWindowSize();
 
   if (!pokerState) return null;
@@ -38,6 +39,57 @@ export default function GameScreen() {
   const state = pokerState;
   const myIndex = state.players.findIndex((p) => p.id === myPlayerId);
   const myPlayer = myIndex >= 0 ? state.players[myIndex] : undefined;
+
+  async function handleLeaveGame() {
+    if (!confirm('途中退席しますか？現在のチップ数で精算されます。')) return;
+    setLeaving(true);
+    try {
+      await leaveGame();
+    } finally {
+      setLeaving(false);
+    }
+  }
+
+  // 自分がゲームに参加していない場合（bust 後 or リエントリー待ち）
+  if (!myPlayer && !isHost) {
+    return (
+      <div id="game-screen" className="playing">
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+            gap: '16px',
+            padding: '24px',
+          }}
+        >
+          <div style={{ fontSize: '16px', color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>
+            次のハンドからリエントリーできます
+          </div>
+          <button
+            onClick={requestReentry}
+            style={{
+              padding: '14px 32px',
+              background: 'linear-gradient(145deg, #f59e0b, #d97706)',
+              border: 'none',
+              borderRadius: '12px',
+              color: '#fff',
+              fontSize: '16px',
+              fontWeight: '700',
+              cursor: 'pointer',
+            }}
+          >
+            リエントリー ({buyin} チップ追加)
+          </button>
+          <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
+            ホストが承認すると次のハンドから参加できます
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // WINNER / SHOWDOWN フェーズは専用ビューを表示
   if (state.phase === 'WINNER' || state.phase === 'SHOWDOWN') {
@@ -138,6 +190,31 @@ export default function GameScreen() {
           onClick={() => setShowHostMenu(true)}
         >
           ⚙️
+        </button>
+      )}
+
+      {/* 途中退席ボタン（非ホスト用） */}
+      {!isHost && (
+        <button
+          disabled={leaving}
+          onClick={handleLeaveGame}
+          style={{
+            position: 'fixed',
+            top: '10px',
+            left: '10px',
+            padding: '8px 12px',
+            background: 'rgba(0,0,0,0.7)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(239,68,68,0.4)',
+            borderRadius: '10px',
+            color: leaving ? 'rgba(255,255,255,0.4)' : '#f87171',
+            fontSize: '12px',
+            fontWeight: '600',
+            cursor: leaving ? 'not-allowed' : 'pointer',
+            zIndex: 100,
+          }}
+        >
+          {leaving ? '退席中...' : '途中退席'}
         </button>
       )}
 

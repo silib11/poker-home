@@ -32,6 +32,8 @@ interface GameContextType {
   readyNextHand: () => void;
   restartGame: () => void;
   updateBlinds: (sb: number, bb: number) => void;
+  leaveGame: () => Promise<void>;
+  requestReentry: () => void;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -80,6 +82,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const allPlayersRef = useRef<Player[]>([]);
   const roomPlayersRef = useRef<Player[]>([]);
 
+  // 自分の最新チップ数を追跡（bustで roomPlayersRef から消えても精算できるよう）
+  const myLastChipsRef = useRef<number>(0);
+
+  // リエントリー待ちプレイヤー（ホスト側で管理）
+  const pendingReentriesRef = useRef<Array<{ id: string; name: string; chips: number }>>([]);
+
   // state と ref を同時に更新
   const setIsHostSync = (v: boolean) => {
     isHostRef.current = v;
@@ -117,12 +125,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       const { doc, updateDoc, collection, addDoc } = await import('firebase/firestore');
       const user = auth.currentUser;
       if (!user) return;
-      const buyin = buyinRef.current;
-      const gameDelta = finalStack - buyin;
+      const totalBuyin = buyinRef.current;
+      const gameDelta = finalStack - totalBuyin;
       const now = Date.now();
       await addDoc(collection(firestore, 'users', user.uid, 'gameResults'), {
         roomId: rtcRef.current?.roomId ?? '',
-        buyin,
+        buyin: totalBuyin,
         finalStack,
         gameDelta,
         savedAt: now,
@@ -133,8 +141,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       if (snap.exists()) {
         const data = snap.data() as { chipBalance: number; lifetimeProfit: number };
         await updateDoc(doc(firestore, 'users', user.uid), {
-          chipBalance: data.chipBalance + gameDelta,
-          lifetimeProfit: data.lifetimeProfit + gameDelta,
+          chipBalance: (data.chipBalance ?? 0) + gameDelta,
+          lifetimeProfit: (data.lifetimeProfit ?? 0) + gameDelta,
           activeRoomId: null,
           updatedAt: now,
         });
@@ -150,11 +158,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (isHostRef.current && rtcRef.current) {
       rtcRef.current.broadcast({ type: 'game_over' });
     }
-    // 自分の最終チップを精算
-    const myPlayer = roomPlayersRef.current.find((p) => p.id === myPlayerIdRef.current);
-    if (myPlayer) {
-      settleGameResult(myPlayer.chips);
-    }
+    // myLastChipsRef で精算（roomPlayersRef は bust 後に更新されるため参照しない）
+    settleGameResult(myLastChipsRef.current);
   }, []);
 
   // 相互参照が必要な関数を ref で保持
@@ -167,9 +172,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       const game = gameRef.current;
       if (!game) return;
 
-      const activePlayers = game.players
+      let activePlayers = game.players
         .filter((p) => p.chips > 0)
         .map((p) => ({ id: p.id, name: p.name, chips: p.chips }));
+
+      // リエントリー待ちのプレイヤーを追加
+      for (const reentry of pendingReentriesRef.current) {
+        if (!activePlayers.find((p) => p.id === reentry.id)) {
+          activePlayers = [...activePlayers, { id: reentry.id, name: reentry.name, chips: reentry.chips }];
+        }
+      }
+      pendingReentriesRef.current = [];
 
       if (activePlayers.length < 2) {
         showGameOver();
@@ -182,6 +195,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       newGame.start();
       gameRef.current = newGame;
 
+      // ホスト自身のチップを更新
+      const hostPlayer = activePlayers.find((p) => p.id === myPlayerIdRef.current);
+      if (hostPlayer) myLastChipsRef.current = hostPlayer.chips;
+
       const state = newGame.getState() as PokerState;
       rtcRef.current?.broadcast({ type: 'game_start', state });
       setPokerState(state);
@@ -193,11 +210,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       if (!game) return;
 
       const activePlayers = game.players.filter((p) => p.chips > 0);
-      if (nextHandReadyRef.current.size >= activePlayers.length) {
-        nextHandReadyRef.current.clear();
-        startNextHandRef.current();
-        return;
+      const totalExpected = activePlayers.length + pendingReentriesRef.current.length;
+      if (nextHandReadyRef.current.size >= Math.max(activePlayers.length, 1)) {
+        // リエントリー待ちは ready 不要（まだゲームに参加していないため）
+        if (nextHandReadyRef.current.size >= activePlayers.length) {
+          nextHandReadyRef.current.clear();
+          startNextHandRef.current();
+          return;
+        }
       }
+
+      void totalExpected; // 未使用変数の警告抑制
 
       const state = game.getState() as PokerState;
       state.nextHandReady = Array.from(nextHandReadyRef.current);
@@ -225,6 +248,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       const newState = game.getState() as PokerState;
       rtcRef.current?.broadcast({ type: 'game_update', state: newState });
       setPokerState(newState);
+
+      // ホストは自分の broadcast を受け取らないため、ここでチップを更新
+      const me = newState.players.find((p: Player) => p.id === myPlayerIdRef.current);
+      if (me) myLastChipsRef.current = me.chips;
     },
     []
   );
@@ -300,6 +327,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
               chips: p.chips,
             }))
           );
+          // 自分のチップ数を別途保持（bust後もroomPlayersRefから消えるため）
+          const me = gs.players.find((p: Player) => p.id === myPlayerIdRef.current);
+          if (me) myLastChipsRef.current = me.chips;
         }
         break;
       }
@@ -314,10 +344,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
       case 'game_over': {
         setScreen('gameover');
-        const myPlayer = roomPlayersRef.current.find((p) => p.id === myPlayerIdRef.current);
-        if (myPlayer) {
-          settleGameResult(myPlayer.chips);
-        }
+        // myLastChipsRef で精算（roomPlayersRef は bust 後更新されるため使わない）
+        settleGameResult(myLastChipsRef.current);
         break;
       }
 
@@ -348,6 +376,71 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           });
         }
         break;
+
+      case 'leave_game': {
+        if (!isHostRef.current) return;
+        const leavingId = data.playerId as string;
+        const game = gameRef.current;
+        if (game) {
+          const idx = game.players.findIndex((p) => p.id === leavingId);
+          if (idx !== -1) {
+            const player = game.players[idx];
+            if (!player.folded && game.phase !== 'WINNER' && game.phase !== 'SHOWDOWN') {
+              if (game.turnIndex === idx) {
+                // 自分のターンならフォールド処理（turn を正しく進める）
+                player.chips = 0;
+                game.fold(idx);
+              } else {
+                // 自分のターン以外：直接フォールド済みにする
+                player.folded = true;
+                player.acted = true;
+                player.chips = 0;
+              }
+            } else {
+              player.chips = 0;
+            }
+          }
+        }
+        const newState = game?.getState() as PokerState | undefined;
+        if (newState && game) {
+          rtcRef.current?.broadcast({ type: 'game_update', state: newState });
+          setPokerState(newState);
+          const remaining = game.players.filter((p) => p.chips > 0);
+          if (remaining.length < 2) {
+            showGameOver();
+          }
+        }
+        break;
+      }
+
+      case 'reentry_request': {
+        if (!isHostRef.current) return;
+        const playerId = data.playerId as string;
+        const playerName = data.name as string;
+        const reentryChips = buyinRef.current;
+        pendingReentriesRef.current = [
+          ...pendingReentriesRef.current,
+          { id: playerId, name: playerName, chips: reentryChips },
+        ];
+        rtcRef.current?.broadcast({
+          type: 'reentry_approved',
+          playerId,
+          chips: reentryChips,
+        });
+        break;
+      }
+
+      case 'reentry_approved': {
+        const approvedId = data.playerId as string;
+        if (approvedId === myPlayerIdRef.current) {
+          const addedChips = data.chips as number;
+          // 累積バイイン更新（精算時に正しい損益を計算するため）
+          buyinRef.current += addedChips;
+          setBuyin(buyinRef.current);
+          myLastChipsRef.current = addedChips;
+        }
+        break;
+      }
     }
   };
 
@@ -457,6 +550,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // 初期チップを記録
+    myLastChipsRef.current = buyinRef.current;
+
     const game = new PokerGame(players, sbRef.current, bbRef.current);
     gameRef.current = game;
     game.start();
@@ -513,6 +609,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setCurrentRoomId(null);
     setRoomPlayersSync([]);
     allPlayersRef.current = [];
+    pendingReentriesRef.current = [];
     setIsHostSync(false);
     setMyPlayerIdSync(null);
     setMyPlayerNameSync(null);
@@ -524,6 +621,32 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setSbSync(newSb);
     setBbSync(newBb);
     rtcRef.current?.broadcast({ type: 'blinds', sb: newSb, bb: newBb });
+  }, []);
+
+  // 途中退席（非ホスト用）
+  const leaveGame = useCallback(async () => {
+    await settleGameResult(myLastChipsRef.current);
+    rtcRef.current?.send({
+      type: 'leave_game',
+      playerId: myPlayerIdRef.current,
+    });
+    setPokerState(null);
+    setCurrentRoomId(null);
+    setRoomPlayersSync([]);
+    allPlayersRef.current = [];
+    setIsHostSync(false);
+    setMyPlayerIdSync(null);
+    setMyPlayerNameSync(null);
+    setScreen('setup');
+  }, []);
+
+  // リエントリー申請
+  const requestReentry = useCallback(() => {
+    rtcRef.current?.send({
+      type: 'reentry_request',
+      playerId: myPlayerIdRef.current,
+      name: myPlayerNameRef.current,
+    });
   }, []);
 
   return (
@@ -546,6 +669,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         readyNextHand,
         restartGame,
         updateBlinds,
+        leaveGame,
+        requestReentry,
       }}
     >
       {children}

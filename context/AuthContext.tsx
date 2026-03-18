@@ -419,7 +419,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (profile.friendIds.includes(friendUid)) return;
     const now = Date.now();
     const newIds = [...profile.friendIds, friendUid];
+
+    // 自分のリストに相手を追加
     await updateDoc(doc(firestore, 'users', user.uid), { friendIds: newIds, updatedAt: now });
+
+    // 相手のリストにも自分を追加（firestore.rules で許可）
+    try {
+      const friendSnap = await getDoc(doc(firestore, 'users', friendUid));
+      if (friendSnap.exists()) {
+        const friendData = friendSnap.data() as UserProfile;
+        if (!friendData.friendIds.includes(user.uid)) {
+          await updateDoc(doc(firestore, 'users', friendUid), {
+            friendIds: [...friendData.friendIds, user.uid],
+            updatedAt: now,
+          });
+        }
+      }
+    } catch {
+      // 相手側の更新失敗は自分側の登録をブロックしない
+    }
+
     setProfile((prev) => prev ? { ...prev, friendIds: newIds, updatedAt: now } : prev);
   }, [user, profile]);
 
@@ -427,7 +446,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user || !profile) return;
     const now = Date.now();
     const newIds = profile.friendIds.filter((id) => id !== friendUid);
+
+    // 自分のリストから相手を削除
     await updateDoc(doc(firestore, 'users', user.uid), { friendIds: newIds, updatedAt: now });
+
+    // 相手のリストからも自分を削除（firestore.rules で許可）
+    try {
+      const friendSnap = await getDoc(doc(firestore, 'users', friendUid));
+      if (friendSnap.exists()) {
+        const friendData = friendSnap.data() as UserProfile;
+        if (friendData.friendIds.includes(user.uid)) {
+          await updateDoc(doc(firestore, 'users', friendUid), {
+            friendIds: friendData.friendIds.filter((id) => id !== user.uid),
+            updatedAt: now,
+          });
+        }
+      }
+    } catch {
+      // 相手側の更新失敗は自分側の削除をブロックしない
+    }
+
     setProfile((prev) => prev ? { ...prev, friendIds: newIds, updatedAt: now } : prev);
   }, [user, profile]);
 

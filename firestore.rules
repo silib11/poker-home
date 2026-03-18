@@ -5,6 +5,22 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if request.auth != null;
       allow create, update, delete: if request.auth != null && request.auth.uid == userId;
+
+      // 相互フレンド登録: 自分の UID を相手の friendIds に追加・削除する操作のみ許可
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['friendIds', 'updatedAt'])
+        && (
+          // 自分の UID を追加する場合
+          (request.resource.data.friendIds.hasAll(resource.data.friendIds)
+           && request.resource.data.friendIds.size() == resource.data.friendIds.size() + 1
+           && request.resource.data.friendIds.hasAll([request.auth.uid]))
+          ||
+          // 自分の UID を削除する場合
+          (resource.data.friendIds.hasAll(request.resource.data.friendIds)
+           && resource.data.friendIds.size() == request.resource.data.friendIds.size() + 1
+           && resource.data.friendIds.hasAll([request.auth.uid]))
+        );
+
       // ゲーム結果サブコレクション: 本人のみ読み書き
       match /gameResults/{resultId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
