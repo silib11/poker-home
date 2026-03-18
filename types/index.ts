@@ -83,6 +83,7 @@ export interface RoomMeta {
 /** RTDB userSessions/{uid} の形状。単一ログイン拒否用。 */
 export interface UserSession {
   sessionId: string;
+  deviceId: string;
   lastSeen: number;
   activeRoomId: string | null;
   status: 'online';

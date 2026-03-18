@@ -57,6 +57,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 const INITIAL_CHIPS = 5000;
 
 const SESSION_STORAGE_KEY_PREFIX = 'poker_session_';
+const DEVICE_STORAGE_KEY = 'poker_device_id';
 const PERMISSION_RETRY_DELAY_MS = 500;
 const inFlightSessionClaims = new Map<string, Promise<{ success: true; sessionId: string } | { success: false }>>();
 const AUTH_DEBUG_PREFIX = '[AuthContext]';
@@ -76,6 +77,15 @@ function storeSessionId(uid: string, sessionId: string): void {
 
 function clearSessionStorage(uid: string): void {
   sessionStorage?.removeItem(sessionStorageKey(uid));
+}
+
+function getDeviceId(): string {
+  if (typeof localStorage === 'undefined') return 'server';
+  const existing = localStorage.getItem(DEVICE_STORAGE_KEY);
+  if (existing) return existing;
+  const next = crypto.randomUUID();
+  localStorage.setItem(DEVICE_STORAGE_KEY, next);
+  return next;
 }
 
 function sessionRef(uid: string) {
@@ -105,35 +115,37 @@ async function ensureAuthToken(uid: string): Promise<void> {
 }
 
 /** 既存セッションが有効なら取得せず失敗。期限切れか空なら自セッションで取得。 */
-async function claimSession(uid: string): Promise<{ success: true; sessionId: string } | { success: false }> {
+async function claimSession(uid: string, deviceId: string): Promise<{ success: true; sessionId: string } | { success: false }> {
   const sessionId = crypto.randomUUID();
   const now = Date.now();
   const result = await runTransaction(sessionRef(uid), (current: UserSession | null) => {
-    if (current && current.lastSeen && now - current.lastSeen < TTL) {
+    if (current && current.lastSeen && now - current.lastSeen < TTL && current.deviceId !== deviceId) {
       return undefined; // abort transaction → we treat as "already active"
     }
     const next: UserSession = {
-      sessionId,
+      sessionId: current?.deviceId === deviceId ? current.sessionId : sessionId,
+      deviceId,
       lastSeen: now,
-      activeRoomId: null,
+      activeRoomId: current?.deviceId === deviceId ? current.activeRoomId : null,
       status: 'online',
     };
     return next;
   });
   if (result.committed) {
-    return { success: true, sessionId };
+    const data = result.snapshot.val() as UserSession | null;
+    return { success: true, sessionId: data?.sessionId ?? sessionId };
   }
   return { success: false };
 }
 
 /** ログイン直後は Realtime Database に認証が伝播するまで一瞬かかることがあるため、permission_denied 時に1回だけリトライする。 */
-async function claimSessionWithRetry(uid: string): Promise<{ success: true; sessionId: string } | { success: false }> {
+async function claimSessionWithRetry(uid: string, deviceId: string): Promise<{ success: true; sessionId: string } | { success: false }> {
   try {
-    return await claimSession(uid);
+    return await claimSession(uid, deviceId);
   } catch (err) {
     if (!isPermissionDenied(err)) throw err;
     await sleep(PERMISSION_RETRY_DELAY_MS);
-    return await claimSession(uid);
+    return await claimSession(uid, deviceId);
   }
 }
 
@@ -147,7 +159,7 @@ async function claimSessionForUser(user: User): Promise<{ success: true; session
 
   const promise = (async () => {
     await ensureAuthToken(user.uid);
-    return await claimSessionWithRetry(user.uid);
+    return await claimSessionWithRetry(user.uid, getDeviceId());
   })().finally(() => {
     inFlightSessionClaims.delete(user.uid);
   });
@@ -251,6 +263,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setAuthLoading(false);
               return;
             }
+            if (
+              data &&
+              data.deviceId === getDeviceId() &&
+              data.lastSeen &&
+              now - data.lastSeen < TTL
+            ) {
+              authDebug('sessionStorage:validate:recover_same_device', { uid, sessionId: data.sessionId });
+              storeSessionId(uid, data.sessionId);
+              currentSessionIdRef.current = data.sessionId;
+              await loadProfile(uid);
+              setAuthLoading(false);
+              return;
+            }
           } catch (getErr) {
             authDebug('sessionStorage:validate:error', getErr);
             if (!isPermissionDenied(getErr)) throw getErr;
@@ -303,6 +328,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const now = Date.now();
       const payload: UserSession = {
         sessionId: sid,
+        deviceId: getDeviceId(),
         lastSeen: now,
         activeRoomId: profile?.activeRoomId ?? null,
         status: 'online',
