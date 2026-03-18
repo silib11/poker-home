@@ -385,8 +385,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           const idx = game.players.findIndex((p) => p.id === leavingId);
           if (idx !== -1) {
             const player = game.players[idx];
-            if (!player.folded && game.phase !== 'WINNER' && game.phase !== 'SHOWDOWN') {
-              if (game.turnIndex === idx) {
+            const gamePhase = (game as unknown as { phase: string }).phase;
+            if (!player.folded && gamePhase !== 'WINNER' && gamePhase !== 'SHOWDOWN') {
+              if ((game as unknown as { turnIndex: number }).turnIndex === idx) {
                 // 自分のターンならフォールド処理（turn を正しく進める）
                 player.chips = 0;
                 game.fold(idx);
