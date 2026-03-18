@@ -58,14 +58,16 @@ export class PokerGame {
         const sbIndex = (this.dealerIndex + 1) % this.players.length;
         const bbIndex = (this.dealerIndex + 2) % this.players.length;
         
-        this.players[sbIndex].chips -= this.sb;
-        this.players[sbIndex].bet = this.sb;
-        this.players[sbIndex].totalBetThisHand = this.sb;
+        const sbAmount = Math.min(this.sb, this.players[sbIndex].chips);
+        this.players[sbIndex].chips -= sbAmount;
+        this.players[sbIndex].bet = sbAmount;
+        this.players[sbIndex].totalBetThisHand = sbAmount;
         this.players[sbIndex].acted = false;
         
-        this.players[bbIndex].chips -= this.bb;
-        this.players[bbIndex].bet = this.bb;
-        this.players[bbIndex].totalBetThisHand = this.bb;
+        const bbAmount = Math.min(this.bb, this.players[bbIndex].chips);
+        this.players[bbIndex].chips -= bbAmount;
+        this.players[bbIndex].bet = bbAmount;
+        this.players[bbIndex].totalBetThisHand = bbAmount;
         this.players[bbIndex].acted = false;
         
         this.currentBet = this.bb;

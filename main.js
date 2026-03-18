@@ -28,6 +28,7 @@ let myPlayerName = null;
 let currentRoomId = null;
 let nextHandReady = new Set();
 let allPlayers = []; // 全プレイヤーを保持（ゲーム再開用）
+let lastRenderedState = null;
 let gameState = {
     players: [],
     buyin: 1000,
@@ -274,10 +275,7 @@ function handlePlayerAction(data) {
     } else if (data.action === 'call') {
         game.call(playerIndex);
     } else if (data.action === 'bet') {
-        // amountは「追加で出す額」なので、現在のベット額に加算して総ベット額にする
-        const player = game.players[playerIndex];
-        const totalBet = player.bet + parseInt(data.amount);
-        game.bet(playerIndex, totalBet);
+        game.bet(playerIndex, parseInt(data.amount));
     }
     
     const newState = game.getState();
@@ -299,6 +297,7 @@ function handlePlayerAction(data) {
 }
 
 function renderGame(state) {
+    lastRenderedState = state;
     const gameArea = document.getElementById('game-area');
     const topBar = document.getElementById('top-bar');
     const roomIdInfo = document.getElementById('room-id-info');
@@ -549,17 +548,22 @@ function renderGame(state) {
         if (isTurn) classes += ' is-active';
         if (isDealer) classes += ' is-dealer';
         if (hasBet) classes += ' has-bet';
+        if (p.folded) classes += ' folded';
         
         html += `<div class="${classes}" style="left:${pos.x}px; top:${pos.y}px;">`;
         html += '<div class="opponent-box">';
         html += '<span class="dealer-chip">D</span>';
         html += `<span class="opponent-name">${p.name}</span>`;
         html += `<span class="opponent-stack">$${p.chips}</span>`;
-        if (p.lastAction) html += `<span class="opponent-action">${p.lastAction}</span>`;
+        if (p.folded) {
+            html += `<span class="opponent-action opponent-action-fold">FOLD</span>`;
+        } else if (p.lastAction) {
+            html += `<span class="opponent-action">${p.lastAction}</span>`;
+        }
         html += '</div>';
         html += '<div class="opponent-cards">';
-        html += renderCard({}, true);
-        html += renderCard({}, true);
+        html += `<div class="mini-card${p.folded ? ' folded' : ''}"></div>`;
+        html += `<div class="mini-card${p.folded ? ' folded' : ''}"></div>`;
         html += '</div>';
         html += `<div class="bet-badge">$${p.bet}</div>`;
         html += '</div>';
@@ -587,7 +591,7 @@ function renderGame(state) {
             html += '<div class="slider-wrapper">';
             html += '<div class="slider-track"></div>';
             html += '<div class="slider-fill" id="sliderFill"></div>';
-            html += `<input type="range" class="bet-slider" id="betSlider" min="${minBetAmount}" max="${maxBetAmount}" value="${minBetAmount}" step="${state.bb}">`;
+            html += `<input type="range" class="bet-slider" id="betSlider" min="${minBetAmount}" max="${maxBetAmount}" value="${minBetAmount}" step="1">`;
             html += '</div>';
             html += '<div class="quick-bets">';
             html += `<button class="quick-bet-btn" data-bet="${minBetAmount}">MIN</button>`;
@@ -604,7 +608,7 @@ function renderGame(state) {
     html += '<div class="bottom-row">';
     
     // My Stack
-    html += '<div class="my-stack-area"><div class="my-stack-box">';
+    html += `<div class="my-stack-area"><div class="my-stack-box${isTurn ? ' is-my-turn' : ''}">`;
     html += '<div class="my-stack-label">Stack</div>';
     html += `<div class="my-stack-value">$${myPlayer ? myPlayer.chips : 0}</div>`;
     if (myPlayer && myPlayer.bet > 0) {
@@ -624,7 +628,8 @@ function renderGame(state) {
     // Actions
     html += '<div class="action-area">';
     if (isTurn && myPlayer && !myPlayer.folded) {
-        html += `<button class="action-btn btn-fold" onclick="sendAction('fold')">Fold</button>`;
+        html += '<div class="my-turn-banner">YOUR TURN</div>';
+        html += `<button class="action-btn btn-fold" onclick="confirmFold()">Fold</button>`;
         
         const isCheck = state.currentBet === 0 || state.currentBet === myPlayer.bet;
         if (isCheck) {
@@ -698,6 +703,54 @@ function renderGame(state) {
         });
     }
 }
+
+window.confirmFold = function() {
+    const state = lastRenderedState;
+    const myPlayer = state && state.players.find(p => p.id === myPlayerId);
+    const canCheck = state && (state.currentBet === 0 || state.currentBet === (myPlayer ? myPlayer.bet : 0));
+
+    if (canCheck) {
+        showFoldConfirm();
+    } else {
+        sendAction('fold');
+    }
+};
+
+window.showFoldConfirm = function() {
+    const existing = document.getElementById('foldConfirmModal');
+    if (existing) return;
+
+    const modal = document.createElement('div');
+    modal.id = 'foldConfirmModal';
+    modal.style.cssText = `
+        position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+        z-index: 999; display: flex; align-items: center; justify-content: center;
+    `;
+    modal.innerHTML = `
+        <div style="
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+            border-radius: 16px; padding: 28px 24px; width: 80%; max-width: 320px;
+            border: 1px solid rgba(255,255,255,0.15); text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+        ">
+            <div style="font-size:18px; font-weight:700; color:#fff; margin-bottom:8px;">本当にフォールドしますか？</div>
+            <div style="font-size:13px; color:#9ca3af; margin-bottom:24px;">チェックできます。フォールドしなくても大丈夫です。</div>
+            <div style="display:flex; gap:12px;">
+                <button onclick="document.getElementById('foldConfirmModal').remove()" style="
+                    flex:1; padding:14px; background:rgba(255,255,255,0.1);
+                    border:1px solid rgba(255,255,255,0.2); border-radius:10px;
+                    color:#fff; font-size:15px; font-weight:600; margin:0;
+                ">キャンセル</button>
+                <button onclick="document.getElementById('foldConfirmModal').remove(); sendAction('fold')" style="
+                    flex:1; padding:14px; background:linear-gradient(145deg,#ef4444,#dc2626);
+                    border:none; border-radius:10px; color:#fff;
+                    font-size:15px; font-weight:700; margin:0;
+                ">フォールド</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+};
 
 window.sendAction = function(action, amount) {
     console.log('sendAction:', action, amount, 'myPlayerId:', myPlayerId, 'isHost:', isHost);
