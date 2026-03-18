@@ -39,12 +39,14 @@
 ## ファイル構成
 
 ```
-index.html          # UI
-style.css           # スタイル
-main.js             # UI制御・WebRTC統合
-webrtc.js           # WebRTC接続管理
-poker.js            # ゲームロジック
-*.test.js           # テストコード
+index.html                  # エントリHTML
+src/style.css               # スタイル
+src/main.js                 # 初期化と配線
+src/network/webrtc.js       # WebRTC接続管理
+core/poker.js               # ゲームロジック
+tests/*.test.js             # テストコード
+docs/*.md                   # ドキュメント
+sandbox/test.html           # UIモック
 ```
 
 ---
@@ -113,7 +115,7 @@ poker.js            # ゲームロジック
 
 ## ゲームロジック詳細
 
-### PokerGame クラス（poker.js）
+### PokerGame クラス（core/poker.js）
 
 #### 初期化
 - プレイヤー配列管理
@@ -158,7 +160,7 @@ poker.js            # ゲームロジック
 
 ## WebRTC 通信設計
 
-### WebRTCManager クラス（webrtc.js）
+### WebRTCManager クラス（src/network/webrtc.js）
 
 #### ホスト側
 - createRoom()：ルーム作成
@@ -180,23 +182,23 @@ poker.js            # ゲームロジック
 
 ## テスト実装状況
 
-### poker.test.js
+### tests/poker.test.js
 - ゲーム初期化
 - ブラインド徴収
 - ベット処理
 - フェーズ進行
 - 役判定
 
-### allin.test.js
+### tests/allin.test.js
 - オールイン処理
 - サイドポット計算
 - 複数オールイン
 
-### allin-4players.test.js
+### tests/allin-4players.test.js
 - 4人プレイ時のサイドポット
 - 複雑なオールインシナリオ
 
-### ui.test.js
+### tests/ui.test.js
 - ポジション表示
 - プレイヤー配置
 

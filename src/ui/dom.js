@@ -1,0 +1,20 @@
+export const dom = {
+    setupScreen: document.getElementById('setup-screen'),
+    gameScreen: document.getElementById('game-screen'),
+    roomIdInfo: document.getElementById('room-id-info'),
+    createBtn: document.getElementById('create-room'),
+    joinBtn: document.getElementById('join-room'),
+    hostNameInput: document.getElementById('host-name'),
+    playerNameInput: document.getElementById('player-name'),
+    roomIdInput: document.getElementById('room-id-input'),
+    buyinInput: document.getElementById('buyin-input'),
+    sbInput: document.getElementById('sb-input'),
+    bbInput: document.getElementById('bb-input'),
+    hostMenuBtn: document.getElementById('host-menu-btn'),
+    hostModal: document.getElementById('host-modal'),
+    closeHostModal: document.getElementById('close-host-modal'),
+    sbControl: document.getElementById('sb-control'),
+    bbControl: document.getElementById('bb-control'),
+    updateBlindsBtn: document.getElementById('update-blinds'),
+    startGameBtn: document.getElementById('start-game')
+};

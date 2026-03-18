@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "test": "node poker.test.js && node ui.test.js && node allin.test.js",
-    "test:poker": "node poker.test.js",
-    "test:ui": "node ui.test.js",
-    "test:allin": "node allin.test.js"
+    "test": "node tests/poker.test.js && node tests/ui.test.js && node tests/allin.test.js && node tests/allin-4players.test.js",
+    "test:poker": "node tests/poker.test.js",
+    "test:ui": "node tests/ui.test.js",
+    "test:allin": "node tests/allin.test.js",
+    "test:allin4": "node tests/allin-4players.test.js"
   }
 }

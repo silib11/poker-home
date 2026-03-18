@@ -1,4 +1,4 @@
-import { PokerGame } from './poker.js';
+import { PokerGame } from '../core/poker.js';
 
 const tests = [];
 let passed = 0;

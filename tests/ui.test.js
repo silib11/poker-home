@@ -1,4 +1,5 @@
-import { PokerGame } from './poker.js';
+import { PokerGame } from '../core/poker.js';
+import { getPositionName } from '../src/utils/playerPositions.js';
 
 // シンプルなテストフレームワーク
 const tests = [];
@@ -19,38 +20,6 @@ function assertTrue(condition, message = '') {
     if (!condition) {
         throw new Error(message || '条件がfalseです');
     }
-}
-
-// ポジション名取得関数（main.jsから複製）
-function getPositionName(index, dealerIndex, totalPlayers) {
-    if (totalPlayers === 2) return null;
-    if (totalPlayers === 3) return null;
-    
-    // ポジションの順序：D(0) → SB(1) → BB(2) → UTG(3) → LJ(4) → HJ(5) → CO(6) → D
-    // 優先順位：UTG > CO > HJ > LJ
-    const positionsAfterBB = [];
-    for (let i = 3; i < totalPlayers; i++) {
-        const pos = (dealerIndex + i) % totalPlayers;
-        positionsAfterBB.push(pos);
-    }
-    
-    if (totalPlayers === 4) {
-        if (index === positionsAfterBB[0]) return 'UTG';
-    } else if (totalPlayers === 5) {
-        if (index === positionsAfterBB[0]) return 'UTG';
-        if (index === positionsAfterBB[positionsAfterBB.length - 1]) return 'CO';
-    } else if (totalPlayers === 6) {
-        if (index === positionsAfterBB[0]) return 'UTG';
-        if (index === positionsAfterBB[1]) return 'HJ';
-        if (index === positionsAfterBB[positionsAfterBB.length - 1]) return 'CO';
-    } else if (totalPlayers >= 7) {
-        if (index === positionsAfterBB[0]) return 'UTG';
-        if (index === positionsAfterBB[1]) return 'LJ';
-        if (index === positionsAfterBB[2]) return 'HJ';
-        if (index === positionsAfterBB[positionsAfterBB.length - 1]) return 'CO';
-    }
-    
-    return null;
 }
 
 // UIテスト
