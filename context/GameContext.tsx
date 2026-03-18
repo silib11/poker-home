@@ -22,12 +22,11 @@ interface GameContextType {
   bb: number;
   pokerState: PokerState | null;
   createRoom: (
-    name: string,
     buyin: number,
     sb: number,
     bb: number
   ) => Promise<void>;
-  joinRoom: (roomId: string, name: string) => Promise<void>;
+  joinRoom: (roomId: string) => Promise<void>;
   startGame: () => void;
   sendAction: (action: string, amount?: number) => void;
   readyNextHand: () => void;
@@ -43,6 +42,25 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
   const [myPlayerName, setMyPlayerName] = useState<string | null>(null);
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
+
+  // AuthContext は GameProvider の外側にあるため、動的 import で循環を避ける
+  async function getPlayerName(): Promise<string> {
+    try {
+      const { auth } = await import('@/lib/firebase');
+      const { getDoc, doc } = await import('firebase/firestore');
+      const { firestore } = await import('@/lib/firebase');
+      const user = auth.currentUser;
+      if (!user) throw new Error('not authenticated');
+      const snap = await getDoc(doc(firestore, 'users', user.uid));
+      if (snap.exists()) {
+        const data = snap.data() as { playerName?: string };
+        if (data.playerName) return data.playerName;
+      }
+    } catch {
+      // フォールバック
+    }
+    return '名無し';
+  }
   const [roomPlayers, setRoomPlayers] = useState<Player[]>([]);
   const [buyin, setBuyin] = useState(1000);
   const [sb, setSb] = useState(10);
@@ -92,11 +110,50 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setRoomPlayers(v);
   };
 
+  // ゲーム終了時の精算処理
+  async function settleGameResult(finalStack: number) {
+    try {
+      const { auth, firestore } = await import('@/lib/firebase');
+      const { doc, updateDoc, collection, addDoc } = await import('firebase/firestore');
+      const user = auth.currentUser;
+      if (!user) return;
+      const buyin = buyinRef.current;
+      const gameDelta = finalStack - buyin;
+      const now = Date.now();
+      await addDoc(collection(firestore, 'users', user.uid, 'gameResults'), {
+        roomId: rtcRef.current?.roomId ?? '',
+        buyin,
+        finalStack,
+        gameDelta,
+        savedAt: now,
+      });
+      const snap = await import('firebase/firestore').then(({ getDoc }) =>
+        getDoc(doc(firestore, 'users', user.uid))
+      );
+      if (snap.exists()) {
+        const data = snap.data() as { chipBalance: number; lifetimeProfit: number };
+        await updateDoc(doc(firestore, 'users', user.uid), {
+          chipBalance: data.chipBalance + gameDelta,
+          lifetimeProfit: data.lifetimeProfit + gameDelta,
+          activeRoomId: null,
+          updatedAt: now,
+        });
+      }
+    } catch {
+      // 精算失敗はゲーム進行をブロックしない
+    }
+  }
+
   // ゲームオーバー
   const showGameOver = useCallback(() => {
     setScreen('gameover');
     if (isHostRef.current && rtcRef.current) {
       rtcRef.current.broadcast({ type: 'game_over' });
+    }
+    // 自分の最終チップを精算
+    const myPlayer = roomPlayersRef.current.find((p) => p.id === myPlayerIdRef.current);
+    if (myPlayer) {
+      settleGameResult(myPlayer.chips);
     }
   }, []);
 
@@ -255,9 +312,26 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         break;
       }
 
-      case 'game_over':
+      case 'game_over': {
         setScreen('gameover');
+        const myPlayer = roomPlayersRef.current.find((p) => p.id === myPlayerIdRef.current);
+        if (myPlayer) {
+          settleGameResult(myPlayer.chips);
+        }
         break;
+      }
+
+      case 'return_to_lobby': {
+        setPokerState(null);
+        setCurrentRoomId(null);
+        setRoomPlayersSync([]);
+        allPlayersRef.current = [];
+        setIsHostSync(false);
+        setMyPlayerIdSync(null);
+        setMyPlayerNameSync(null);
+        setScreen('setup');
+        break;
+      }
 
       case 'ready_next_hand':
         if (!isHostRef.current) return;
@@ -286,7 +360,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   // ルーム作成
   const createRoom = useCallback(
-    async (name: string, buyinVal: number, sbVal: number, bbVal: number) => {
+    async (buyinVal: number, sbVal: number, bbVal: number) => {
+      const name = await getPlayerName();
       setMyPlayerNameSync(name);
       setIsHostSync(true);
       setBuyinSync(buyinVal);
@@ -303,6 +378,33 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       setMyPlayerIdSync(playerId);
       setCurrentRoomId(roomId);
 
+      // ルームメタ情報を RTDB に保存
+      try {
+        const { ref, set } = await import('firebase/database');
+        const { db } = await import('@/lib/firebase');
+        const { auth } = await import('@/lib/firebase');
+        await set(ref(db, `roomMeta/${roomId}`), {
+          buyin: buyinVal,
+          sb: sbVal,
+          bb: bbVal,
+          hostUid: auth.currentUser?.uid ?? '',
+          hostName: name,
+          createdAt: Date.now(),
+        });
+        // プロフィールの activeRoomId を更新
+        const { firestore } = await import('@/lib/firebase');
+        const { doc, updateDoc } = await import('firebase/firestore');
+        const uid = auth.currentUser?.uid;
+        if (uid) {
+          await updateDoc(doc(firestore, 'users', uid), {
+            activeRoomId: roomId,
+            updatedAt: Date.now(),
+          });
+        }
+      } catch {
+        // メタ保存失敗はゲーム進行をブロックしない
+      }
+
       const hostPlayer: Player = { id: playerId, name, chips: buyinVal };
       allPlayersRef.current = [hostPlayer];
       setRoomPlayersSync([hostPlayer]);
@@ -313,7 +415,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   // ルーム参加
   const joinRoom = useCallback(
-    async (roomId: string, name: string) => {
+    async (roomId: string) => {
+      const name = await getPlayerName();
       setMyPlayerNameSync(name);
       setIsHostSync(false);
       setCurrentRoomId(roomId);
@@ -325,6 +428,22 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       rtc.onConnected = () => rtc.send({ type: 'join', name });
 
       await rtc.joinRoom(roomId);
+
+      // プロフィールの activeRoomId を更新
+      try {
+        const { auth, firestore } = await import('@/lib/firebase');
+        const { doc, updateDoc } = await import('firebase/firestore');
+        const uid = auth.currentUser?.uid;
+        if (uid) {
+          await updateDoc(doc(firestore, 'users', uid), {
+            activeRoomId: roomId,
+            updatedAt: Date.now(),
+          });
+        }
+      } catch {
+        // activeRoomId 更新失敗はゲーム進行をブロックしない
+      }
+
       setScreen('waiting');
     },
     [handleMessage]
@@ -379,29 +498,26 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // ゲーム再スタート
+  // ゲーム再スタート（アカウント残高制のため精算後にトップへ戻す）
   const restartGame = useCallback(() => {
-    const allPlayers = allPlayersRef.current.map((p) => ({
-      id: p.id,
-      name: p.name,
-      chips: buyinRef.current,
-    }));
-
-    const game = new PokerGame(allPlayers, sbRef.current, bbRef.current);
-    gameRef.current = game;
-    game.start();
-
-    const state = game.getState() as PokerState;
-    setRoomPlayersSync(allPlayers);
-    rtcRef.current?.broadcast({
-      type: 'game_restart',
-      state,
-      buyin: buyinRef.current,
-      allPlayers,
-    });
-    setPokerState(state);
-    setScreen('playing');
-  }, []);
+    if (isHostRef.current && rtcRef.current) {
+      rtcRef.current.broadcast({ type: 'return_to_lobby' });
+    }
+    // ルームメタを削除
+    import('@/lib/firebase').then(({ db, auth }) => {
+      import('firebase/database').then(({ ref, remove }) => {
+        if (currentRoomId) remove(ref(db, `roomMeta/${currentRoomId}`));
+      });
+    }).catch(() => {});
+    setPokerState(null);
+    setCurrentRoomId(null);
+    setRoomPlayersSync([]);
+    allPlayersRef.current = [];
+    setIsHostSync(false);
+    setMyPlayerIdSync(null);
+    setMyPlayerNameSync(null);
+    setScreen('setup');
+  }, [currentRoomId]);
 
   // ブラインド更新
   const updateBlinds = useCallback((newSb: number, newBb: number) => {

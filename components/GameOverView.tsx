@@ -33,6 +33,9 @@ export default function GameOverView() {
             プレイヤーが足りません
           </div>
         )}
+        <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.5)', margin: '12px 0' }}>
+          チップ精算が完了しました。プロフィールに反映されます。
+        </div>
         {isHost ? (
           <button
             onClick={restartGame}
@@ -44,11 +47,11 @@ export default function GameOverView() {
               background: '#00aa00',
             }}
           >
-            新しいゲームを開始
+            ロビーへ戻る
           </button>
         ) : (
           <div style={{ margin: '20px 0', color: '#aaa' }}>
-            ホストが新しいゲームを開始するまでお待ちください
+            ホストがロビーへ戻るまでお待ちください
           </div>
         )}
       </div>

@@ -23,7 +23,7 @@ export default function SetupScreen() {
     }
     setLoading('create');
     try {
-      await createRoom(hostName.trim(), buyinInput, sbInput, bbInput);
+      await createRoom(buyinInput, sbInput, bbInput);
     } catch {
       alert('ルーム作成に失敗しました');
     } finally {
@@ -42,7 +42,7 @@ export default function SetupScreen() {
     }
     setLoading('join');
     try {
-      await joinRoom(roomIdInput.trim().toUpperCase(), joinName.trim());
+      await joinRoom(roomIdInput.trim().toUpperCase());
     } catch {
       alert('参加に失敗しました');
     } finally {
