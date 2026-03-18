@@ -106,6 +106,19 @@ async function claimSession(uid: string): Promise<{ success: true; sessionId: st
   return { success: false };
 }
 
+const SESSION_CLAIM_RETRY_DELAY_MS = 500;
+
+/** ログイン直後は Realtime Database に認証が伝播するまで一瞬かかることがあるため、permission_denied 時に1回だけリトライする。 */
+async function claimSessionWithRetry(uid: string): Promise<{ success: true; sessionId: string } | { success: false }> {
+  try {
+    return await claimSession(uid);
+  } catch (err) {
+    if (!isPermissionDenied(err)) throw err;
+    await new Promise((r) => setTimeout(r, SESSION_CLAIM_RETRY_DELAY_MS));
+    return await claimSession(uid);
+  }
+}
+
 function buildInitialProfile(uid: string, email: string, playerName: string): Omit<UserProfile, 'createdAt' | 'updatedAt'> {
   return {
     uid,
@@ -195,7 +208,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setAuthLoading(false);
           return;
         }
-        const result = await claimSession(uid);
+        const result = await claimSessionWithRetry(uid);
         if (!result.success) {
           await signOut(auth);
           clearSessionStorage(uid);
@@ -265,7 +278,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const cred = await signInWithEmailAndPassword(auth, email, password);
       const uid = cred.user.uid;
       try {
-        const result = await claimSession(uid);
+        const result = await claimSessionWithRetry(uid);
         if (!result.success) {
           await signOut(auth);
           clearSessionStorage(uid);
