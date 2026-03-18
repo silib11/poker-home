@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ユーザー自身のプロフィール: 認証済みなら誰でも読める（フレンド一覧用）、書けるのは本人のみ
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if request.auth != null && request.auth.uid == userId;
+      // ゲーム結果サブコレクション: 本人のみ読み書き
+      match /gameResults/{resultId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+  }
+}
