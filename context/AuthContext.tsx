@@ -229,21 +229,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               return;
             }
           } catch (getErr) {
-            if (isPermissionDenied(getErr)) {
-              clearSessionStorage(uid);
-              currentSessionIdRef.current = null;
-              await loadProfile(uid);
-              setAuthLoading(false);
-              return;
-            }
-            throw getErr;
+            if (!isPermissionDenied(getErr)) throw getErr;
           }
-          await signOut(auth);
+          // 古い sessionStorage が残っていても、即ログアウトせず新しいセッションを取り直す。
           clearSessionStorage(uid);
           currentSessionIdRef.current = null;
-          setProfile(null);
-          setAuthLoading(false);
-          return;
         }
         const result = await claimSessionForUser(u);
         if (!result.success) {
