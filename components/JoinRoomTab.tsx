@@ -190,6 +190,7 @@ export default function JoinRoomTab() {
                       border: 'none',
                       cursor: !canJoin ? 'not-allowed' : 'pointer',
                       whiteSpace: 'nowrap',
+                      alignSelf: 'flex-end',
                     }}
                   >
                     {loading === room.activeRoomId ? '参加中...' : '参加'}
@@ -237,6 +238,7 @@ export default function JoinRoomTab() {
               border: 'none',
               cursor: loading === 'input' ? 'not-allowed' : 'pointer',
               whiteSpace: 'nowrap',
+              alignSelf: 'flex-end',
             }}
           >
             {loading === 'input' ? '参加中...' : '参加'}

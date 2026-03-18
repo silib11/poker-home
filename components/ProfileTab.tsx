@@ -138,6 +138,7 @@ export default function ProfileTab() {
             fontSize: '13px',
             color: 'rgba(255,255,255,0.6)',
             cursor: 'pointer',
+            alignSelf: 'flex-end',
           }}
         >
           ログアウト
@@ -223,6 +224,7 @@ export default function ProfileTab() {
                 fontSize: '12px',
                 color: 'rgba(255,255,255,0.6)',
                 cursor: 'pointer',
+                alignSelf: 'flex-end',
               }}
             >
               編集
