@@ -57,6 +57,8 @@ const AuthContext = createContext<AuthContextType | null>(null);
 const INITIAL_CHIPS = 5000;
 
 const SESSION_STORAGE_KEY_PREFIX = 'poker_session_';
+const PERMISSION_RETRY_DELAY_MS = 500;
+const inFlightSessionClaims = new Map<string, Promise<{ success: true; sessionId: string } | { success: false }>>();
 
 function sessionStorageKey(uid: string): string {
   return `${SESSION_STORAGE_KEY_PREFIX}${uid}`;
@@ -84,6 +86,15 @@ function isPermissionDenied(err: unknown): boolean {
   return e?.code === 'PERMISSION_DENIED' || /permission_denied/i.test(String(e?.message ?? ''));
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function ensureAuthToken(uid: string): Promise<void> {
+  if (auth.currentUser?.uid !== uid) return;
+  await auth.currentUser.getIdToken();
+}
+
 /** 既存セッションが有効なら取得せず失敗。期限切れか空なら自セッションで取得。 */
 async function claimSession(uid: string): Promise<{ success: true; sessionId: string } | { success: false }> {
   const sessionId = crypto.randomUUID();
@@ -106,17 +117,34 @@ async function claimSession(uid: string): Promise<{ success: true; sessionId: st
   return { success: false };
 }
 
-const SESSION_CLAIM_RETRY_DELAY_MS = 500;
-
 /** ログイン直後は Realtime Database に認証が伝播するまで一瞬かかることがあるため、permission_denied 時に1回だけリトライする。 */
 async function claimSessionWithRetry(uid: string): Promise<{ success: true; sessionId: string } | { success: false }> {
   try {
     return await claimSession(uid);
   } catch (err) {
     if (!isPermissionDenied(err)) throw err;
-    await new Promise((r) => setTimeout(r, SESSION_CLAIM_RETRY_DELAY_MS));
+    await sleep(PERMISSION_RETRY_DELAY_MS);
     return await claimSession(uid);
   }
+}
+
+/**
+ * signInWithEmailAndPassword() と onAuthStateChanged() が同時に走るため、
+ * 同じ UID へのセッション確保トランザクションは 1 本にまとめる。
+ */
+async function claimSessionForUser(user: User): Promise<{ success: true; sessionId: string } | { success: false }> {
+  const existing = inFlightSessionClaims.get(user.uid);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    await ensureAuthToken(user.uid);
+    return await claimSessionWithRetry(user.uid);
+  })().finally(() => {
+    inFlightSessionClaims.delete(user.uid);
+  });
+
+  inFlightSessionClaims.set(user.uid, promise);
+  return await promise;
 }
 
 function buildInitialProfile(uid: string, email: string, playerName: string): Omit<UserProfile, 'createdAt' | 'updatedAt'> {
@@ -142,7 +170,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadProfile = useCallback(async (uid: string) => {
     setProfileLoading(true);
     try {
-      const snap = await getDoc(doc(firestore, 'users', uid));
+      await ensureAuthToken(uid);
+      let snap;
+      try {
+        snap = await getDoc(doc(firestore, 'users', uid));
+      } catch (err) {
+        if (!isPermissionDenied(err)) throw err;
+        await sleep(PERMISSION_RETRY_DELAY_MS);
+        await ensureAuthToken(uid);
+        snap = await getDoc(doc(firestore, 'users', uid));
+      }
       if (snap.exists()) {
         setProfile(snap.data() as UserProfile);
       }
@@ -208,7 +245,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setAuthLoading(false);
           return;
         }
-        const result = await claimSessionWithRetry(uid);
+        const result = await claimSessionForUser(u);
         if (!result.success) {
           await signOut(auth);
           clearSessionStorage(uid);
@@ -278,7 +315,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const cred = await signInWithEmailAndPassword(auth, email, password);
       const uid = cred.user.uid;
       try {
-        const result = await claimSessionWithRetry(uid);
+        const result = await claimSessionForUser(cred.user);
         if (!result.success) {
           await signOut(auth);
           clearSessionStorage(uid);
