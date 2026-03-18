@@ -131,14 +131,15 @@ export default function ProfileTab() {
         <button
           onClick={logOut}
           style={{
+            width: 'auto',
             padding: '6px 14px',
+            margin: 0,
             background: 'rgba(255,255,255,0.07)',
             border: '1px solid rgba(255,255,255,0.15)',
             borderRadius: '8px',
             fontSize: '13px',
             color: 'rgba(255,255,255,0.6)',
             cursor: 'pointer',
-            alignSelf: 'flex-end',
           }}
         >
           ログアウト
@@ -217,14 +218,15 @@ export default function ProfileTab() {
             <button
               onClick={() => { setNameInput(profile?.playerName ?? ''); setEditingName(true); }}
               style={{
+                width: 'auto',
                 padding: '4px 12px',
+                margin: 0,
                 background: 'rgba(255,255,255,0.08)',
                 border: '1px solid rgba(255,255,255,0.15)',
                 borderRadius: '6px',
                 fontSize: '12px',
                 color: 'rgba(255,255,255,0.6)',
                 cursor: 'pointer',
-                alignSelf: 'flex-end',
               }}
             >
               編集
@@ -458,7 +460,9 @@ export default function ProfileTab() {
                 <button
                   onClick={() => removeFriend(f.uid)}
                   style={{
+                    width: 'auto',
                     padding: '4px 10px',
+                    margin: 0,
                     background: 'rgba(239,68,68,0.15)',
                     border: '1px solid rgba(239,68,68,0.3)',
                     borderRadius: '6px',
