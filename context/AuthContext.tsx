@@ -50,6 +50,7 @@ interface AuthContextType {
   removeFriend: (friendUid: string) => Promise<void>;
   setActiveRoom: (roomId: string | null) => Promise<void>;
   getFriendProfiles: () => Promise<Array<{ uid: string; playerName: string; activeRoomId: string | null }>>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -60,8 +61,6 @@ const SESSION_STORAGE_KEY_PREFIX = 'poker_session_';
 const DEVICE_STORAGE_KEY = 'poker_device_id';
 const PERMISSION_RETRY_DELAY_MS = 500;
 const inFlightSessionClaims = new Map<string, Promise<{ success: true; sessionId: string } | { success: false }>>();
-const AUTH_DEBUG_PREFIX = '[AuthContext]';
-
 function sessionStorageKey(uid: string): string {
   return `${SESSION_STORAGE_KEY_PREFIX}${uid}`;
 }
@@ -95,14 +94,6 @@ function sessionRef(uid: string) {
 function isPermissionDenied(err: unknown): boolean {
   const e = err as { code?: string; message?: string };
   return e?.code === 'PERMISSION_DENIED' || /permission_denied/i.test(String(e?.message ?? ''));
-}
-
-function authDebug(message: string, details?: unknown): void {
-  if (details === undefined) {
-    console.log(`${AUTH_DEBUG_PREFIX} ${message}`);
-    return;
-  }
-  console.log(`${AUTH_DEBUG_PREFIX} ${message}`, details);
 }
 
 function sleep(ms: number): Promise<void> {
@@ -190,27 +181,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadProfile = useCallback(async (uid: string) => {
     setProfileLoading(true);
-    authDebug('loadProfile:start', { uid });
     try {
       await ensureAuthToken(uid);
       let snap;
       try {
         snap = await getDoc(doc(firestore, 'users', uid));
       } catch (err) {
-        authDebug('loadProfile:first_attempt_failed', err);
         if (!isPermissionDenied(err)) throw err;
         await sleep(PERMISSION_RETRY_DELAY_MS);
         await ensureAuthToken(uid);
         snap = await getDoc(doc(firestore, 'users', uid));
       }
       if (snap.exists()) {
-        authDebug('loadProfile:success', { uid });
         setProfile(snap.data() as UserProfile);
-      } else {
-        authDebug('loadProfile:not_found', { uid });
       }
     } catch (err) {
-      authDebug('loadProfile:error', err);
       throw err;
     } finally {
       setProfileLoading(false);
@@ -231,10 +216,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      authDebug('onAuthStateChanged', { uid: u?.uid ?? null });
       setUser(u);
       if (!u) {
-        authDebug('onAuthStateChanged:signed_out');
         currentSessionIdRef.current = null;
         setProfile(null);
         setAuthLoading(false);
@@ -243,21 +226,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const uid = u.uid;
       try {
         const storedId = getStoredSessionId(uid);
-        authDebug('sessionStorage:read', { uid, storedId });
         if (storedId) {
           try {
-            authDebug('sessionStorage:validate:start', { uid, storedId });
             const snap = await get(sessionRef(uid));
             const data = snap.val() as UserSession | null;
             const now = Date.now();
-            authDebug('sessionStorage:validate:snapshot', { uid, data });
             if (
               data &&
               data.sessionId === storedId &&
               data.lastSeen &&
               now - data.lastSeen < TTL
             ) {
-              authDebug('sessionStorage:validate:matched', { uid, storedId });
               currentSessionIdRef.current = storedId;
               await loadProfile(uid);
               setAuthLoading(false);
@@ -269,7 +248,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               data.lastSeen &&
               now - data.lastSeen < TTL
             ) {
-              authDebug('sessionStorage:validate:recover_same_device', { uid, sessionId: data.sessionId });
               storeSessionId(uid, data.sessionId);
               currentSessionIdRef.current = data.sessionId;
               await loadProfile(uid);
@@ -277,19 +255,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               return;
             }
           } catch (getErr) {
-            authDebug('sessionStorage:validate:error', getErr);
             if (!isPermissionDenied(getErr)) throw getErr;
           }
-          // 古い sessionStorage が残っていても、即ログアウトせず新しいセッションを取り直す。
-          authDebug('sessionStorage:validate:stale_or_denied', { uid, storedId });
           clearSessionStorage(uid);
           currentSessionIdRef.current = null;
         }
-        authDebug('session:claim:start', { uid });
         const result = await claimSessionForUser(u);
-        authDebug('session:claim:result', { uid, result });
         if (!result.success) {
-          authDebug('session:claim:already_logged_in', { uid });
           await signOut(auth);
           clearSessionStorage(uid);
           currentSessionIdRef.current = null;
@@ -299,12 +271,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         storeSessionId(uid, result.sessionId);
         currentSessionIdRef.current = result.sessionId;
-        authDebug('session:claim:stored', { uid, sessionId: result.sessionId });
         setupOnDisconnect(uid);
         await loadProfile(uid);
         setAuthLoading(false);
       } catch (err) {
-        authDebug('onAuthStateChanged:error', err);
         if (isPermissionDenied(err)) {
           clearSessionStorage(uid);
           currentSessionIdRef.current = null;
@@ -358,18 +328,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logIn = useCallback(
     async (email: string, password: string) => {
-      authDebug('logIn:start', { email });
       setAuthLoading(true);
       await signInWithEmailAndPassword(auth, email, password);
-      authDebug('logIn:signInWithEmailAndPassword:success');
-      // ログイン後のセッション確保とプロフィール読込は onAuthStateChanged 側に一本化する。
     },
     []
   );
 
   const logOut = useCallback(async () => {
     const uid = auth.currentUser?.uid;
-    authDebug('logOut:start', { uid: uid ?? null });
     if (uid) {
       await clearSessionOnServer(uid);
       clearSessionStorage(uid);
@@ -476,6 +442,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile((prev) => prev ? { ...prev, activeRoomId: roomId, updatedAt: now } : prev);
   }, [user]);
 
+  const refreshProfile = useCallback(async () => {
+    if (!user) return;
+    await loadProfile(user.uid);
+  }, [user, loadProfile]);
+
   const getFriendProfiles = useCallback(async () => {
     if (!profile || profile.friendIds.length === 0) return [];
     const chunks: string[][] = [];
@@ -511,6 +482,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         removeFriend,
         setActiveRoom,
         getFriendProfiles,
+        refreshProfile,
       }}
     >
       {children}

@@ -9,6 +9,7 @@ import React, {
 } from 'react';
 import { PokerGame } from '../core/poker.js';
 import type { Player, PokerState, Screen } from '@/types';
+import { useAuth } from '@/context/AuthContext';
 
 interface GameContextType {
   screen: Screen;
@@ -39,6 +40,10 @@ interface GameContextType {
 const GameContext = createContext<GameContextType | null>(null);
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
+  const { refreshProfile } = useAuth();
+  const refreshProfileRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  refreshProfileRef.current = refreshProfile;
+
   const [screen, setScreen] = useState<Screen>('setup');
   const [isHost, setIsHost] = useState(false);
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
@@ -159,7 +164,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       rtcRef.current.broadcast({ type: 'game_over' });
     }
     // myLastChipsRef で精算（roomPlayersRef は bust 後に更新されるため参照しない）
-    settleGameResult(myLastChipsRef.current);
+    settleGameResult(myLastChipsRef.current).finally(() => {
+      refreshProfileRef.current();
+    });
   }, []);
 
   // 相互参照が必要な関数を ref で保持
@@ -345,7 +352,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       case 'game_over': {
         setScreen('gameover');
         // myLastChipsRef で精算（roomPlayersRef は bust 後更新されるため使わない）
-        settleGameResult(myLastChipsRef.current);
+        settleGameResult(myLastChipsRef.current).finally(() => {
+          refreshProfileRef.current();
+        });
         break;
       }
 
@@ -627,6 +636,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   // 途中退席（非ホスト用）
   const leaveGame = useCallback(async () => {
     await settleGameResult(myLastChipsRef.current);
+    refreshProfileRef.current();
     rtcRef.current?.send({
       type: 'leave_game',
       playerId: myPlayerIdRef.current,
