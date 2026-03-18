@@ -216,18 +216,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(id);
   }, [user?.uid, profile?.activeRoomId]);
 
-  const signUp = useCallback(async (email: string, password: string, playerName: string) => {
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
-    const now = Date.now();
-    const initial = {
-      ...buildInitialProfile(cred.user.uid, email, playerName),
-      createdAt: now,
-      updatedAt: now,
-    };
-    await setDoc(doc(firestore, 'users', cred.user.uid), initial);
-    setProfile(initial);
-    // セッション取得は onAuthStateChanged 側で行う（二重 claim を避ける）
-  }, []);
+  const signUp = useCallback(
+    async (email: string, password: string, playerName: string) => {
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      const now = Date.now();
+      const initial = {
+        ...buildInitialProfile(cred.user.uid, email, playerName),
+        createdAt: now,
+        updatedAt: now,
+      };
+      await setDoc(doc(firestore, 'users', cred.user.uid), initial);
+      // DB に書いた直後に loadProfile で反映（onAuthStateChanged の loadProfile より先に確定させる）
+      await loadProfile(cred.user.uid);
+    },
+    [loadProfile]
+  );
 
   const logIn = useCallback(
     async (email: string, password: string) => {
