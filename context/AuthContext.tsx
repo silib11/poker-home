@@ -79,6 +79,11 @@ function sessionRef(uid: string) {
   return ref(db, `userSessions/${uid}`);
 }
 
+function isPermissionDenied(err: unknown): boolean {
+  const e = err as { code?: string; message?: string };
+  return e?.code === 'PERMISSION_DENIED' || /permission_denied/i.test(String(e?.message ?? ''));
+}
+
 /** 既存セッションが有効なら取得せず失敗。期限切れか空なら自セッションで取得。 */
 async function claimSession(uid: string): Promise<{ success: true; sessionId: string } | { success: false }> {
   const sessionId = crypto.randomUUID();
@@ -155,43 +160,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       const uid = u.uid;
-      const storedId = getStoredSessionId(uid);
-      if (storedId) {
-        const snap = await get(sessionRef(uid));
-        const data = snap.val() as UserSession | null;
-        const now = Date.now();
-        if (
-          data &&
-          data.sessionId === storedId &&
-          data.lastSeen &&
-          now - data.lastSeen < TTL
-        ) {
-          currentSessionIdRef.current = storedId;
+      try {
+        const storedId = getStoredSessionId(uid);
+        if (storedId) {
+          try {
+            const snap = await get(sessionRef(uid));
+            const data = snap.val() as UserSession | null;
+            const now = Date.now();
+            if (
+              data &&
+              data.sessionId === storedId &&
+              data.lastSeen &&
+              now - data.lastSeen < TTL
+            ) {
+              currentSessionIdRef.current = storedId;
+              await loadProfile(uid);
+              setAuthLoading(false);
+              return;
+            }
+          } catch (getErr) {
+            if (isPermissionDenied(getErr)) {
+              clearSessionStorage(uid);
+              currentSessionIdRef.current = null;
+              await loadProfile(uid);
+              setAuthLoading(false);
+              return;
+            }
+            throw getErr;
+          }
+          await signOut(auth);
+          clearSessionStorage(uid);
+          currentSessionIdRef.current = null;
+          setProfile(null);
+          setAuthLoading(false);
+          return;
+        }
+        const result = await claimSession(uid);
+        if (!result.success) {
+          await signOut(auth);
+          clearSessionStorage(uid);
+          currentSessionIdRef.current = null;
+          setProfile(null);
+          setAuthLoading(false);
+          return;
+        }
+        storeSessionId(uid, result.sessionId);
+        currentSessionIdRef.current = result.sessionId;
+        setupOnDisconnect(uid);
+        await loadProfile(uid);
+        setAuthLoading(false);
+      } catch (err) {
+        if (isPermissionDenied(err)) {
+          clearSessionStorage(uid);
+          currentSessionIdRef.current = null;
           await loadProfile(uid);
           setAuthLoading(false);
           return;
         }
-        await signOut(auth);
-        clearSessionStorage(uid);
-        currentSessionIdRef.current = null;
-        setProfile(null);
         setAuthLoading(false);
-        return;
+        throw err;
       }
-      const result = await claimSession(uid);
-      if (!result.success) {
-        await signOut(auth);
-        clearSessionStorage(uid);
-        currentSessionIdRef.current = null;
-        setProfile(null);
-        setAuthLoading(false);
-        return;
-      }
-      storeSessionId(uid, result.sessionId);
-      currentSessionIdRef.current = result.sessionId;
-      setupOnDisconnect(uid);
-      await loadProfile(uid);
-      setAuthLoading(false);
     });
     return unsubscribe;
   }, [loadProfile, setupOnDisconnect]);
@@ -236,17 +264,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (email: string, password: string) => {
       const cred = await signInWithEmailAndPassword(auth, email, password);
       const uid = cred.user.uid;
-      const result = await claimSession(uid);
-      if (!result.success) {
-        await signOut(auth);
-        clearSessionStorage(uid);
-        currentSessionIdRef.current = null;
-        throw new Error(ALREADY_LOGGED_IN);
+      try {
+        const result = await claimSession(uid);
+        if (!result.success) {
+          await signOut(auth);
+          clearSessionStorage(uid);
+          currentSessionIdRef.current = null;
+          throw new Error(ALREADY_LOGGED_IN);
+        }
+        storeSessionId(uid, result.sessionId);
+        currentSessionIdRef.current = result.sessionId;
+        setupOnDisconnect(uid);
+        await loadProfile(uid);
+      } catch (err) {
+        if (isPermissionDenied(err)) {
+          currentSessionIdRef.current = null;
+          await loadProfile(uid);
+          return;
+        }
+        throw err;
       }
-      storeSessionId(uid, result.sessionId);
-      currentSessionIdRef.current = result.sessionId;
-      setupOnDisconnect(uid);
-      await loadProfile(uid);
     },
     [loadProfile, setupOnDisconnect]
   );
