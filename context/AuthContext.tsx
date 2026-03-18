@@ -302,30 +302,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logIn = useCallback(
     async (email: string, password: string) => {
-      const cred = await signInWithEmailAndPassword(auth, email, password);
-      const uid = cred.user.uid;
-      try {
-        const result = await claimSessionForUser(cred.user);
-        if (!result.success) {
-          await signOut(auth);
-          clearSessionStorage(uid);
-          currentSessionIdRef.current = null;
-          throw new Error(ALREADY_LOGGED_IN);
-        }
-        storeSessionId(uid, result.sessionId);
-        currentSessionIdRef.current = result.sessionId;
-        setupOnDisconnect(uid);
-        await loadProfile(uid);
-      } catch (err) {
-        if (isPermissionDenied(err)) {
-          currentSessionIdRef.current = null;
-          await loadProfile(uid);
-          return;
-        }
-        throw err;
-      }
+      setAuthLoading(true);
+      await signInWithEmailAndPassword(auth, email, password);
+      // ログイン後のセッション確保とプロフィール読込は onAuthStateChanged 側に一本化する。
     },
-    [loadProfile, setupOnDisconnect]
+    []
   );
 
   const logOut = useCallback(async () => {
