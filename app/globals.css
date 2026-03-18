@@ -1014,3 +1014,26 @@ input[type="range"]::-moz-range-thumb {
 .ranking-btn:active {
     background: rgba(0, 0, 0, 0.85);
 }
+
+/* Profile tab: スマホで入力欄を広く・ボタンはコンパクトに */
+.profile-tab .profile-tab-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.profile-tab .profile-tab-input {
+    min-width: 0;
+}
+
+@media (max-width: 480px) {
+    .profile-tab .profile-tab-row .profile-tab-input {
+        flex: 1 1 100%;
+        width: 100%;
+    }
+
+    .profile-tab .profile-tab-btn {
+        flex: 0 0 auto;
+    }
+}

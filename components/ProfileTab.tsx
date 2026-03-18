@@ -13,7 +13,7 @@ interface FriendInfo {
 }
 
 export default function ProfileTab() {
-  const { user, profile, logOut, updatePlayerName, topUpChips, addFriend, removeFriend } = useAuth();
+  const { user, profile, profileLoading, logOut, updatePlayerName, topUpChips, addFriend, removeFriend } = useAuth();
 
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
@@ -26,6 +26,14 @@ export default function ProfileTab() {
   const [addingFriend, setAddingFriend] = useState(false);
   const [friendInfos, setFriendInfos] = useState<FriendInfo[]>([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
+
+  const [uidCopied, setUidCopied] = useState(false);
+
+  useEffect(() => {
+    if (profile?.playerName != null && !editingName) {
+      setNameInput(profile.playerName);
+    }
+  }, [profile?.playerName, editingName]);
 
   useEffect(() => {
     if (!profile || profile.friendIds.length === 0) {
@@ -96,6 +104,18 @@ export default function ProfileTab() {
     }
   }
 
+  async function handleCopyUid() {
+    const uid = user?.uid;
+    if (!uid) return;
+    try {
+      await navigator.clipboard.writeText(uid);
+      setUidCopied(true);
+      setTimeout(() => setUidCopied(false), 2000);
+    } catch {
+      alert('コピーに失敗しました');
+    }
+  }
+
   const profitColor = !profile
     ? '#fff'
     : profile.lifetimeProfit > 0
@@ -105,7 +125,7 @@ export default function ProfileTab() {
     : '#fff';
 
   return (
-    <div style={{ padding: '24px 20px', maxWidth: '480px', margin: '0 auto' }}>
+    <div className="profile-tab" style={{ padding: '24px 20px', maxWidth: '480px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <h2 style={{ fontSize: '20px', fontWeight: 'bold' }}>プロフィール</h2>
         <button
@@ -136,28 +156,31 @@ export default function ProfileTab() {
       >
         <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginBottom: '8px' }}>プレイヤー名</div>
         {editingName ? (
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div className="profile-tab-row">
             <input
               type="text"
               value={nameInput}
               onChange={(e) => setNameInput(e.target.value)}
               maxLength={10}
               autoFocus
+              className="profile-tab-input"
               style={{
                 flex: 1,
-                padding: '8px 12px',
+                minWidth: 0,
+                padding: '10px 12px',
                 background: 'rgba(255,255,255,0.08)',
                 border: '1px solid rgba(255,255,255,0.2)',
                 borderRadius: '8px',
                 color: '#fff',
-                fontSize: '15px',
+                fontSize: '16px',
               }}
             />
             <button
               onClick={handleSaveName}
               disabled={nameSaving}
+              className="profile-tab-btn profile-tab-btn-primary"
               style={{
-                padding: '8px 14px',
+                padding: '8px 12px',
                 background: '#22c55e',
                 borderRadius: '8px',
                 fontWeight: '600',
@@ -171,6 +194,7 @@ export default function ProfileTab() {
             </button>
             <button
               onClick={() => setEditingName(false)}
+              className="profile-tab-btn"
               style={{
                 padding: '8px 12px',
                 background: 'rgba(255,255,255,0.1)',
@@ -186,7 +210,9 @@ export default function ProfileTab() {
           </div>
         ) : (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '18px', fontWeight: '600' }}>{profile?.playerName}</span>
+            <span style={{ fontSize: '18px', fontWeight: '600' }}>
+              {profileLoading ? '読み込み中...' : (profile?.playerName?.trim() || '未設定')}
+            </span>
             <button
               onClick={() => { setNameInput(profile?.playerName ?? ''); setEditingName(true); }}
               style={{
@@ -230,8 +256,26 @@ export default function ProfileTab() {
         }}
       >
         <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>あなたのUID（フレンド追加に使用）</div>
-        <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', wordBreak: 'break-all', fontFamily: 'monospace' }}>
-          {user?.uid}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 0, fontSize: '12px', color: 'rgba(255,255,255,0.5)', wordBreak: 'break-all', fontFamily: 'monospace' }}>
+            {user?.uid}
+          </div>
+          <button
+            type="button"
+            onClick={handleCopyUid}
+            style={{
+              padding: '6px 12px',
+              background: uidCopied ? '#22c55e' : 'rgba(255,255,255,0.1)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              borderRadius: '6px',
+              fontSize: '12px',
+              color: '#fff',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {uidCopied ? 'コピーしました' : 'コピー'}
+          </button>
         </div>
       </div>
 
@@ -286,32 +330,35 @@ export default function ProfileTab() {
         <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', marginBottom: '10px' }}>
           チップ追加（生涯収支から差し引かれます）
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="profile-tab-row">
           <input
             type="number"
             value={topUpAmount}
             min={100}
             step={100}
             onChange={(e) => setTopUpAmount(Number(e.target.value))}
+            className="profile-tab-input"
             style={{
               flex: 1,
+              minWidth: 0,
               padding: '10px 14px',
               background: 'rgba(255,255,255,0.08)',
               border: '1px solid rgba(255,255,255,0.15)',
               borderRadius: '8px',
               color: '#fff',
-              fontSize: '15px',
+              fontSize: '16px',
             }}
           />
           <button
             onClick={handleTopUp}
             disabled={topUpLoading}
+            className="profile-tab-btn"
             style={{
-              padding: '10px 16px',
+              padding: '8px 14px',
               background: topUpLoading ? '#555' : 'linear-gradient(145deg, #f59e0b, #d97706)',
               borderRadius: '8px',
               fontWeight: '600',
-              fontSize: '14px',
+              fontSize: '13px',
               color: '#fff',
               border: 'none',
               cursor: topUpLoading ? 'not-allowed' : 'pointer',
@@ -329,27 +376,30 @@ export default function ProfileTab() {
           フレンド一覧
         </h3>
 
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+        <div className="profile-tab-row" style={{ marginBottom: '12px' }}>
           <input
             type="text"
             placeholder="フレンドのUID"
             value={friendUidInput}
             onChange={(e) => setFriendUidInput(e.target.value.trim())}
+            className="profile-tab-input"
             style={{
               flex: 1,
+              minWidth: 0,
               padding: '10px 14px',
               background: 'rgba(255,255,255,0.08)',
               border: '1px solid rgba(255,255,255,0.15)',
               borderRadius: '8px',
               color: '#fff',
-              fontSize: '13px',
+              fontSize: '16px',
             }}
           />
           <button
             onClick={handleAddFriend}
             disabled={addingFriend || !friendUidInput.trim()}
+            className="profile-tab-btn"
             style={{
-              padding: '10px 14px',
+              padding: '8px 14px',
               background: addingFriend || !friendUidInput.trim() ? '#555' : 'linear-gradient(145deg, #3b82f6, #2563eb)',
               borderRadius: '8px',
               fontWeight: '600',
