@@ -211,7 +211,7 @@ export default function AuthScreen() {
               cursor: loading ? 'not-allowed' : 'pointer',
             }}
           >
-            {loading ? '処理中...' : mode === 'login' ? 'ログイン' : 'アカウント作成（5000$付与）'}
+            {loading ? '処理中...' : mode === 'login' ? 'ログイン' : 'アカウント作成'}
           </button>
         </div>
       </div>
