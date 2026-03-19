@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
 import ProfitGraphModal from '@/components/ProfitGraphModal';
+import ReleaseNotesModal from '@/components/ReleaseNotesModal';
 import type { GameResult, UserProfile } from '@/types';
 
 interface FriendInfo {
@@ -27,6 +28,7 @@ export default function ProfileTab() {
 
   const [uidCopied, setUidCopied] = useState(false);
   const [showProfitGraph, setShowProfitGraph] = useState(false);
+  const [showReleaseNotes, setShowReleaseNotes] = useState(false);
   const [profitGraphLoading, setProfitGraphLoading] = useState(false);
   const [profitGraphError, setProfitGraphError] = useState<string | null>(null);
   const [gameResults, setGameResults] = useState<GameResult[]>([]);
@@ -441,6 +443,35 @@ export default function ProfileTab() {
         )}
       </div>
 
+      {/* リリースノート */}
+      <button
+        type="button"
+        onClick={() => setShowReleaseNotes(true)}
+        style={{
+          width: '100%',
+          background: 'rgba(255,255,255,0.04)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: '12px',
+          padding: '14px 16px',
+          marginTop: '24px',
+          textAlign: 'left',
+          cursor: 'pointer',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <div>
+          <div style={{ fontSize: '13px', fontWeight: '600', color: 'rgba(255,255,255,0.7)' }}>
+            アップデート履歴
+          </div>
+          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', marginTop: '2px' }}>
+            これまでの主な変更をまとめています
+          </div>
+        </div>
+        <span style={{ fontSize: '16px', color: 'rgba(255,255,255,0.3)' }}>›</span>
+      </button>
+
       {showProfitGraph && (
         <ProfitGraphModal
           results={gameResults}
@@ -448,6 +479,10 @@ export default function ProfileTab() {
           error={profitGraphError}
           onClose={() => setShowProfitGraph(false)}
         />
+      )}
+
+      {showReleaseNotes && (
+        <ReleaseNotesModal onClose={() => setShowReleaseNotes(false)} />
       )}
     </div>
   );
