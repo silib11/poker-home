@@ -1,3 +1,32 @@
+// フラッシュスートの5枚が連続しているかチェック（正しいストレートフラッシュ判定）
+function checkStraightFlush(cards) {
+    const suitCounts = {};
+    cards.forEach(c => {
+        suitCounts[c.suit] = (suitCounts[c.suit] || 0) + 1;
+    });
+
+    const flushSuit = Object.keys(suitCounts).find(s => suitCounts[s] >= 5);
+    if (!flushSuit) return { isStraightFlush: false, straightFlushHigh: 0 };
+
+    const flushValues = [...new Set(
+        cards.filter(c => c.suit === flushSuit).map(c => c.value)
+    )].sort((a, b) => b - a);
+
+    for (let i = 0; i <= flushValues.length - 5; i++) {
+        if (flushValues[i] - flushValues[i + 4] === 4) {
+            return { isStraightFlush: true, straightFlushHigh: flushValues[i] };
+        }
+    }
+
+    // A-2-3-4-5のストレートフラッシュ（スチールホイール）
+    if (flushValues.includes(14) && flushValues.includes(5) &&
+        flushValues.includes(4) && flushValues.includes(3) && flushValues.includes(2)) {
+        return { isStraightFlush: true, straightFlushHigh: 5 };
+    }
+
+    return { isStraightFlush: false, straightFlushHigh: 0 };
+}
+
 export class PokerGame {
     constructor(players, sb, bb) {
         this.players = players.map((p, i) => ({
@@ -408,7 +437,8 @@ export class PokerGame {
             isStraight = true;
         }
         
-        if (isFlush && isStraight) return 'ストレートフラッシュ';
+        const { isStraightFlush } = checkStraightFlush(cards);
+        if (isStraightFlush) return 'ストレートフラッシュ';
         if (counts[0].count === 4) return 'フォーカード';
         if (counts[0].count === 3 && counts[1].count >= 2) return 'フルハウス';
         if (isFlush) return 'フラッシュ';
@@ -467,8 +497,9 @@ export class PokerGame {
         
         // 役の判定
         // ストレートフラッシュ
-        if (isFlush && isStraight) {
-            return 8000000 + straightHigh;
+        const { isStraightFlush, straightFlushHigh } = checkStraightFlush(cards);
+        if (isStraightFlush) {
+            return 8000000 + straightFlushHigh;
         }
         
         // フォーカード

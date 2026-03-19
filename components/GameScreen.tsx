@@ -56,6 +56,7 @@ export default function GameScreen() {
   } = useGame();
   const [showRanking, setShowRanking] = useState(false);
   const [showHostMenu, setShowHostMenu] = useState(false);
+  const [showGuestMenu, setShowGuestMenu] = useState(false);
   const [sbInput, setSbInput] = useState(sb);
   const [bbInput, setBbInput] = useState(bb);
   const [leaving, setLeaving] = useState(false);
@@ -64,6 +65,7 @@ export default function GameScreen() {
   // UI用フェーズ演出ステート
   const [visibleCommunityCount, setVisibleCommunityCount] = useState(0);
   const [phaseBanner, setPhaseBanner] = useState<string | null>(null);
+  const [showTableHands, setShowTableHands] = useState(false);
   const [showShowdownHands, setShowShowdownHands] = useState(false);
   const [showShowdownResult, setShowShowdownResult] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -97,6 +99,7 @@ export default function GameScreen() {
       animTimersRef.current = [];
       setVisibleCommunityCount(0);
       setPhaseBanner(null);
+      setShowTableHands(false);
       setShowShowdownHands(false);
       setShowShowdownResult(false);
       setIsAnimating(false);
@@ -138,10 +141,10 @@ export default function GameScreen() {
       const isLast = i === phases.length - 1;
 
       if (phase === 'FLOP' || phase === 'TURN' || phase === 'RIVER') {
-        // バナーを表示（2秒）
+        // バナーを表示（0.5秒）
         const d1 = delay;
         timers.push(setTimeout(() => setPhaseBanner(PHASE_LABEL[phase]), d1));
-        delay += 2000;
+        delay += 500;
 
         // バナーを消してカードを公開
         const count = COMM_COUNT[phase];
@@ -162,31 +165,33 @@ export default function GameScreen() {
               setVisibleCommunityCount(count);
             }, d2)
           );
-          // 次のフェーズバナーまでの短いインターバル
-          delay += 400;
+          // 次のフェーズバナーまでカードを見せる時間（1.5秒）
+          delay += 1500;
         }
       } else if (phase === 'SHOWDOWN') {
-        // SHOWDOWN バナーを表示（2秒）
+        // SHOWDOWN バナーを表示（0.5秒）
         const d3 = delay;
         timers.push(
           setTimeout(() => setPhaseBanner(PHASE_LABEL['SHOWDOWN']), d3)
         );
-        delay += 2000;
+        delay += 500;
 
-        // バナーを消して手札を公開
+        // バナーを消してテーブル上で手札を公開（1.5秒）
         const d4 = delay;
         timers.push(
           setTimeout(() => {
             setPhaseBanner(null);
-            setShowShowdownHands(true);
+            setShowTableHands(true);
           }, d4)
         );
-        delay += 2000;
+        delay += 1500;
 
-        // 結果を表示
+        // ShowdownView（結果ページ）へ遷移
         const d5 = delay;
         timers.push(
           setTimeout(() => {
+            setShowTableHands(false);
+            setShowShowdownHands(true);
             setShowShowdownResult(true);
             setIsAnimating(false);
           }, d5)
@@ -357,6 +362,11 @@ export default function GameScreen() {
                     isDealer={index === state.dealerIndex}
                     x={position.x}
                     y={position.y}
+                    revealedHand={
+                      showTableHands && !player.folded && player.hand?.length
+                        ? player.hand
+                        : undefined
+                    }
                   />
                 );
               })}
@@ -409,29 +419,78 @@ export default function GameScreen() {
         </button>
       )}
 
-      {/* 途中退席ボタン（非ホスト用） */}
+      {/* ゲスト用メニューボタン（非ホスト用） */}
       {!isHost && (
         <button
-          disabled={leaving}
-          onClick={handleLeaveGame}
           style={{
             position: 'fixed',
             top: '10px',
             left: '10px',
-            padding: '8px 12px',
+            width: '44px',
+            height: '44px',
             background: 'rgba(0,0,0,0.7)',
             backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(239,68,68,0.4)',
-            borderRadius: '10px',
-            color: leaving ? 'rgba(255,255,255,0.4)' : '#f87171',
-            fontSize: '12px',
-            fontWeight: '600',
-            cursor: leaving ? 'not-allowed' : 'pointer',
+            border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: '12px',
+            color: '#fff',
+            fontSize: '18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             zIndex: 100,
+            cursor: 'pointer',
+          }}
+          onClick={() => setShowGuestMenu(true)}
+        >
+          ⚙️
+        </button>
+      )}
+
+      {/* ゲストメニューモーダル */}
+      {showGuestMenu && (
+        <div
+          className="modal"
+          style={{ display: 'flex' }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowGuestMenu(false);
           }}
         >
-          {leaving ? '退席中...' : '途中退席'}
-        </button>
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3>メニュー</h3>
+              <button
+                className="close-btn"
+                onClick={() => setShowGuestMenu(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <button
+                disabled={leaving}
+                onClick={async () => {
+                  setShowGuestMenu(false);
+                  await handleLeaveGame();
+                }}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  background: leaving
+                    ? 'rgba(100,100,100,0.3)'
+                    : 'rgba(239,68,68,0.15)',
+                  border: '1px solid rgba(239,68,68,0.4)',
+                  borderRadius: '10px',
+                  color: leaving ? 'rgba(255,255,255,0.4)' : '#f87171',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  cursor: leaving ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {leaving ? '退席中...' : '途中退席'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ホストメニューモーダル（ゲーム中） */}
