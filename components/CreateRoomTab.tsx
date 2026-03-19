@@ -41,7 +41,7 @@ function generateBlindLevels(
 
   for (let i = 0; i < count; i++) {
     const level = i + 1;
-    const ante = anteStartLevel > 0 && level >= anteStartLevel ? roundToNice(Math.round(bb * 0.1)) : 0;
+    const ante = anteStartLevel > 0 && level >= anteStartLevel ? bb : 0;
     levels.push({ level, sb, bb, ante, durationMinutes });
 
     const candidate = roundToNice(Math.round(bb * 1.5));

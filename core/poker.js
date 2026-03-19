@@ -88,21 +88,19 @@ export class PokerGame {
 
         const isHeadsUp = this.players.length === 2;
 
-        // アンティ徴収（SB/BBより前）
-        if (this.ante > 0) {
-            this.players.forEach(p => {
-                const anteAmount = Math.min(this.ante, p.chips);
-                p.chips -= anteAmount;
-                p.totalBetThisHand += anteAmount;
-                this.pot += anteAmount;
-            });
-        }
-
         if (isHeadsUp) {
             // ヘッズアップルール: ディーラー = SB、相手 = BB
             // PREFLOP: SB(ディーラー)が先にアクション
             const sbIndex = this.dealerIndex;
             const bbIndex = (this.dealerIndex + 1) % 2;
+
+            // BBアンティ（BBの人だけが支払う）
+            if (this.ante > 0) {
+                const anteAmount = Math.min(this.ante, this.players[bbIndex].chips);
+                this.players[bbIndex].chips -= anteAmount;
+                this.players[bbIndex].totalBetThisHand += anteAmount;
+                this.pot += anteAmount;
+            }
 
             const sbAmount = Math.min(this.sb, this.players[sbIndex].chips);
             this.players[sbIndex].chips -= sbAmount;
@@ -124,7 +122,15 @@ export class PokerGame {
             // 通常ルール
             const sbIndex = (this.dealerIndex + 1) % this.players.length;
             const bbIndex = (this.dealerIndex + 2) % this.players.length;
-            
+
+            // BBアンティ（BBの人だけが支払う）
+            if (this.ante > 0) {
+                const anteAmount = Math.min(this.ante, this.players[bbIndex].chips);
+                this.players[bbIndex].chips -= anteAmount;
+                this.players[bbIndex].totalBetThisHand += anteAmount;
+                this.pot += anteAmount;
+            }
+
             const sbAmount = Math.min(this.sb, this.players[sbIndex].chips);
             this.players[sbIndex].chips -= sbAmount;
             this.players[sbIndex].bet = sbAmount;
