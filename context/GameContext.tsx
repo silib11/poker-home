@@ -7,8 +7,17 @@ import React, {
   useRef,
   useCallback,
 } from 'react';
-import { PokerGame } from '../core/poker.js';
-import type { Player, PokerState, Screen } from '@/types';
+import { PokerGame as PokerGameBase } from '../core/poker.js';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const PokerGame = PokerGameBase as any as new (...args: unknown[]) => InstanceType<typeof PokerGameBase>;
+import type {
+  Player,
+  PokerState,
+  Screen,
+  TournamentConfig,
+  TournamentProgress,
+  TournamentRank,
+} from '@/types';
 import { useAuth } from '@/context/AuthContext';
 
 interface GameContextType {
@@ -22,10 +31,16 @@ interface GameContextType {
   sb: number;
   bb: number;
   pokerState: PokerState | null;
+  tournamentConfig: TournamentConfig | null;
+  tournamentProgress: TournamentProgress | null;
+  spectatorIds: string[];
+  rankList: TournamentRank[];
+  showTournamentResult: boolean;
   createRoom: (
     buyin: number,
     sb: number,
-    bb: number
+    bb: number,
+    tournamentConfig?: TournamentConfig
   ) => Promise<void>;
   joinRoom: (roomId: string) => Promise<void>;
   startGame: () => void;
@@ -35,6 +50,7 @@ interface GameContextType {
   updateBlinds: (sb: number, bb: number) => void;
   leaveGame: () => Promise<void>;
   requestReentry: () => void;
+  dismissTournamentResult: () => void;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -52,7 +68,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [myPlayerName, setMyPlayerName] = useState<string | null>(null);
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
 
-  // AuthContext は GameProvider の外側にあるため、動的 import で循環を避ける
   async function getPlayerName(): Promise<string> {
     try {
       const { auth } = await import('@/lib/firebase');
@@ -70,70 +85,67 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
     return '名無し';
   }
+
   const [roomPlayers, setRoomPlayers] = useState<Player[]>([]);
-  // roomBuyin: ルーム設定のバイイン額（変わらない）
   const [roomBuyin, setRoomBuyin] = useState(1000);
   const [sb, setSb] = useState(10);
   const [bb, setBb] = useState(20);
   const [pokerState, setPokerState] = useState<PokerState | null>(null);
 
-  // コールバック内で最新値を参照するための ref
+  // トーナメント関連ステート
+  const [tournamentConfig, setTournamentConfig] = useState<TournamentConfig | null>(null);
+  const [tournamentProgress, setTournamentProgress] = useState<TournamentProgress | null>(null);
+  const [spectatorIds, setSpectatorIds] = useState<string[]>([]);
+  const [rankList, setRankList] = useState<TournamentRank[]>([]);
+  const [showTournamentResult, setShowTournamentResult] = useState(false);
+
+  // ref（コールバック内で最新値を参照するため）
   const isHostRef = useRef(false);
   const myPlayerIdRef = useRef<string | null>(null);
   const myPlayerNameRef = useRef<string | null>(null);
   const sbRef = useRef(10);
   const bbRef = useRef(20);
-  // roomBuyinRef: ルーム設定値（変わらない）
   const roomBuyinRef = useRef(1000);
-  // playerTotalBuyinRef: 自分がそのゲームで実際に払った累計バイイン
   const playerTotalBuyinRef = useRef(0);
   const rtcRef = useRef<import('@/lib/webrtc').WebRTCManager | null>(null);
   const gameRef = useRef<InstanceType<typeof PokerGame> | null>(null);
   const nextHandReadyRef = useRef<Set<string>>(new Set());
   const allPlayersRef = useRef<Player[]>([]);
   const roomPlayersRef = useRef<Player[]>([]);
-
-  // 自分の最新チップ数を追跡（bustで roomPlayersRef から消えても精算できるよう）
   const myLastChipsRef = useRef<number>(0);
-
-  // 次ハンド参加待ち（途中参加 + リエントリーを統合管理、ホスト側で保持）
-  // 参加申請順に push する。次ハンド開始時に逆順で UTG 側へ差し込む。
   const pendingJoinsRef = useRef<Array<{ id: string; name: string; chips: number }>>([]);
-
-  // 後方互換のエイリアス（内部参照用）
   const pendingReentriesRef = pendingJoinsRef;
-
-  // ゲーム進行中かどうか（途中参加の制御用）
   const isPlayingRef = useRef(false);
 
-  // state と ref を同時に更新
-  const setIsHostSync = (v: boolean) => {
-    isHostRef.current = v;
-    setIsHost(v);
+  // トーナメント専用 ref
+  const tournamentConfigRef = useRef<TournamentConfig | null>(null);
+  const tournamentProgressRef = useRef<TournamentProgress | null>(null);
+  const spectatorIdsRef = useRef<Set<string>>(new Set());
+  const bustOrderRef = useRef<number>(0);
+  const rankListRef = useRef<TournamentRank[]>([]);
+  const handNumberRef = useRef<number>(0);
+  const actionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const levelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // state と ref を同時更新
+  const setIsHostSync = (v: boolean) => { isHostRef.current = v; setIsHost(v); };
+  const setMyPlayerIdSync = (v: string | null) => { myPlayerIdRef.current = v; setMyPlayerId(v); };
+  const setMyPlayerNameSync = (v: string | null) => { myPlayerNameRef.current = v; setMyPlayerName(v); };
+  const setSbSync = (v: number) => { sbRef.current = v; setSb(v); };
+  const setBbSync = (v: number) => { bbRef.current = v; setBb(v); };
+  const setRoomBuyinSync = (v: number) => { roomBuyinRef.current = v; setRoomBuyin(v); };
+  const setRoomPlayersSync = (v: Player[]) => { roomPlayersRef.current = v; setRoomPlayers(v); };
+  const setTournamentProgressSync = (v: TournamentProgress | null) => {
+    tournamentProgressRef.current = v;
+    setTournamentProgress(v);
   };
-  const setMyPlayerIdSync = (v: string | null) => {
-    myPlayerIdRef.current = v;
-    setMyPlayerId(v);
+  const setSpectatorIdsSync = (ids: Set<string>) => {
+    spectatorIdsRef.current = ids;
+    setSpectatorIds([...ids]);
   };
-  const setMyPlayerNameSync = (v: string | null) => {
-    myPlayerNameRef.current = v;
-    setMyPlayerName(v);
-  };
-  const setSbSync = (v: number) => {
-    sbRef.current = v;
-    setSb(v);
-  };
-  const setBbSync = (v: number) => {
-    bbRef.current = v;
-    setBb(v);
-  };
-  const setRoomBuyinSync = (v: number) => {
-    roomBuyinRef.current = v;
-    setRoomBuyin(v);
-  };
-  const setRoomPlayersSync = (v: Player[]) => {
-    roomPlayersRef.current = v;
-    setRoomPlayers(v);
+  const setRankListSync = (list: TournamentRank[]) => {
+    rankListRef.current = list;
+    setRankList([...list]);
   };
 
   // ゲーム終了時の精算処理
@@ -149,28 +161,178 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // アクションタイマーをクリア
+  function clearActionTimer() {
+    if (actionTimerRef.current !== null) {
+      clearTimeout(actionTimerRef.current);
+      actionTimerRef.current = null;
+    }
+  }
+
+  // レベルタイマーをクリア
+  function clearLevelTimer() {
+    if (levelTimerRef.current !== null) {
+      clearTimeout(levelTimerRef.current);
+      levelTimerRef.current = null;
+    }
+  }
+
+  // ブラインドレベルを次に進める（ホスト専用）
+  const advanceLevelRef = useRef<() => void>(() => {});
+  const scheduleLevelTimerRef = useRef<() => void>(() => {});
+
+  React.useEffect(() => {
+    advanceLevelRef.current = () => {
+      const config = tournamentConfigRef.current;
+      const progress = tournamentProgressRef.current;
+      if (!config || !progress) return;
+
+      const nextLevel = progress.currentLevel + 1;
+      if (nextLevel >= config.blindLevels.length) return;
+
+      const nextBlind = config.blindLevels[nextLevel];
+      const newProgress: TournamentProgress = {
+        currentLevel: nextLevel,
+        levelStartedAt: Date.now(),
+        isPaused: false,
+        pausedRemaining: 0,
+      };
+      setTournamentProgressSync(newProgress);
+      setSbSync(nextBlind.sb);
+      setBbSync(nextBlind.bb);
+      rtcRef.current?.broadcast({
+        type: 'blinds',
+        sb: nextBlind.sb,
+        bb: nextBlind.bb,
+      });
+      rtcRef.current?.broadcast({
+        type: 'tournament_progress',
+        progress: newProgress,
+      });
+      scheduleLevelTimerRef.current();
+    };
+
+    scheduleLevelTimerRef.current = () => {
+      clearLevelTimer();
+      const config = tournamentConfigRef.current;
+      const progress = tournamentProgressRef.current;
+      if (!config || !progress) return;
+      if (progress.currentLevel >= config.blindLevels.length - 1) return;
+
+      const levelDef = config.blindLevels[progress.currentLevel];
+      const elapsed = Date.now() - progress.levelStartedAt;
+      const totalMs = levelDef.durationMinutes * 60 * 1000;
+      const remaining = Math.max(totalMs - elapsed, 0);
+
+      levelTimerRef.current = setTimeout(() => {
+        advanceLevelRef.current();
+      }, remaining);
+    };
+  }, []);
+
+  // アクションタイマーをスケジュール（ホスト専用）
+  const scheduleActionTimerRef = useRef<(deadline: number, turnIdx: number) => void>(() => {});
+
+  React.useEffect(() => {
+    scheduleActionTimerRef.current = (deadline: number, turnIdx: number) => {
+      clearActionTimer();
+      const delay = Math.max(deadline - Date.now(), 0);
+      actionTimerRef.current = setTimeout(() => {
+        const game = gameRef.current;
+        if (!game) return;
+        const g = game as unknown as { turnIndex: number; phase: string; currentBet: number };
+        if (g.turnIndex !== turnIdx) return;
+        if (g.phase === 'SHOWDOWN' || g.phase === 'WINNER') return;
+
+        const player = game.players[turnIdx];
+        if (!player || player.folded || player.chips === 0) return;
+
+        const currentBet = g.currentBet;
+        const playerBet = player.bet ?? 0;
+        if (currentBet > playerBet) {
+          game.fold(turnIdx);
+        } else {
+          game.check(turnIdx);
+        }
+
+        const newState = game.getState() as PokerState;
+        attachTournamentState(newState);
+        rtcRef.current?.broadcast({ type: 'game_update', state: newState });
+        setPokerState({ ...newState });
+
+        const me = newState.players.find((p: Player) => p.id === myPlayerIdRef.current);
+        if (me) myLastChipsRef.current = me.chips;
+
+        if (newState.phase !== 'SHOWDOWN' && newState.phase !== 'WINNER') {
+          const nextDeadline = Date.now() + 25000;
+          newState.turnDeadlineAt = nextDeadline;
+          rtcRef.current?.broadcast({ type: 'game_update', state: newState });
+          setPokerState({ ...newState });
+          scheduleActionTimerRef.current(nextDeadline, newState.turnIndex);
+        }
+      }, delay);
+    };
+  }, []);
+
+  // PokerState にトーナメント情報を付加
+  function attachTournamentState(state: PokerState) {
+    state.spectatorIds = [...spectatorIdsRef.current];
+    state.handNumber = handNumberRef.current;
+    state.tournamentProgress = tournamentProgressRef.current ?? undefined;
+  }
+
   // ゲームオーバー
   const showGameOver = useCallback(() => {
+    clearActionTimer();
     isPlayingRef.current = false;
     setScreen('gameover');
     if (isHostRef.current && rtcRef.current) {
       rtcRef.current.broadcast({ type: 'game_over' });
     }
-    // myLastChipsRef で精算（roomPlayersRef は bust 後に更新されるため参照しない）
     settleGameResult(myLastChipsRef.current).finally(() => {
       refreshProfileRef.current();
     });
   }, []);
 
-  // 相互参照が必要な関数を ref で保持
   const startNextHandRef = useRef<() => void>(() => {});
   const checkAllReadyRef = useRef<() => void>(() => {});
 
-  // useEffect で最新の実装を ref に詰める
   React.useEffect(() => {
     startNextHandRef.current = () => {
       const game = gameRef.current;
       if (!game) return;
+
+      handNumberRef.current += 1;
+
+      const config = tournamentConfigRef.current;
+      const progress = tournamentProgressRef.current;
+
+      // バスト検知：トーナメントModeの場合は観戦者 or リエントリー判定
+      const bustedPlayers = game.players.filter((p) => p.chips === 0 && !spectatorIdsRef.current.has(p.id));
+      for (const busted of bustedPlayers) {
+        if (config?.enabled) {
+          const currentLevel = progress?.currentLevel ?? 0;
+          if (currentLevel < config.reentryUntilLevel) {
+            // リエントリー可能レベル内 → 既存リエントリーフローに任せる（pendingJoinsに入っていれば継続）
+          } else {
+            // リエントリー締め切り後 → 観戦者として登録
+            const newSpectators = new Set(spectatorIdsRef.current);
+            newSpectators.add(busted.id);
+            setSpectatorIdsSync(newSpectators);
+            bustOrderRef.current += 1;
+            const newRank: TournamentRank = {
+              rank: 0,
+              playerId: busted.id,
+              playerName: busted.name,
+              bustLevel: currentLevel + 1,
+              bustHandNumber: handNumberRef.current,
+            };
+            const newList = [newRank, ...rankListRef.current];
+            setRankListSync(newList);
+            rtcRef.current?.broadcast({ type: 'spectator_update', spectatorIds: [...newSpectators] });
+          }
+        }
+      }
 
       // chips > 0 の継続プレイヤー
       const continuingPlayers = game.players
@@ -183,14 +345,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       );
       pendingJoinsRef.current = [];
 
-      // 待機者を参加申請順の逆順で UTG 位置へ差し込む
-      // UTG = dealerIndex+3 に相当する配列上の位置
-      // 次ハンドの dealerIndex = (currentDealer + 1) % totalLength
-      // を先に決めて UTG 位置を計算する
       const tentativeDealer = (game.dealerIndex + 1) % Math.max(continuingPlayers.length, 1);
       const utgInsertPos = (tentativeDealer + 3) % (continuingPlayers.length + pending.length || 1);
 
-      // 後から来た人ほど不利（先頭に近い UTG に入る）ので逆順で差し込む
       const reversed = [...pending].reverse();
       let players = [...continuingPlayers];
       for (const newcomer of reversed) {
@@ -199,36 +356,58 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (players.length < 2) {
+        // トーナメント終了処理
+        if (config?.enabled && players.length >= 1) {
+          const winner = players[0];
+          const finalRanks: TournamentRank[] = [
+            { rank: 1, playerId: winner.id, playerName: winner.name, bustLevel: (progress?.currentLevel ?? 0) + 1, bustHandNumber: handNumberRef.current },
+            ...rankListRef.current.map((r, i) => ({ ...r, rank: i + 2 })),
+          ];
+          setRankListSync(finalRanks);
+          setShowTournamentResult(true);
+          rtcRef.current?.broadcast({ type: 'tournament_end', rankList: finalRanks });
+          clearLevelTimer();
+        }
         showGameOver();
         return;
       }
 
-      // dealer を再計算（継続プレイヤー配列内の元のインデックスを保持）
       const firstContinuing = continuingPlayers[0];
       const newDealerIndex = firstContinuing
         ? (players.findIndex((p) => p.id === continuingPlayers[tentativeDealer % continuingPlayers.length]?.id) + players.length) % players.length
         : 0;
 
-      const newGame = new PokerGame(players, sbRef.current, bbRef.current);
+      // アンティを取得（現在のレベルから）
+      const currentBlindLevel = config?.enabled && progress
+        ? config.blindLevels[progress.currentLevel]
+        : null;
+      const ante = currentBlindLevel?.ante ?? 0;
+
+      const newGame = new PokerGame(players, sbRef.current, bbRef.current, { ante });
       newGame.dealerIndex = newDealerIndex;
       newGame.start();
       gameRef.current = newGame;
 
-      // ホスト自身のチップを更新
       const hostPlayer = players.find((p) => p.id === myPlayerIdRef.current);
       if (hostPlayer) myLastChipsRef.current = hostPlayer.chips;
 
       const state = newGame.getState() as PokerState;
+      attachTournamentState(state);
+
+      const deadline = Date.now() + 25000;
+      state.turnDeadlineAt = deadline;
+
       rtcRef.current?.broadcast({ type: 'game_start', state });
       setPokerState(state);
       setScreen('playing');
+
+      scheduleActionTimerRef.current(deadline, state.turnIndex);
     };
 
     checkAllReadyRef.current = () => {
       const game = gameRef.current;
       if (!game) return;
 
-      // チップ > 0 の現ハンド参加者だけでready判定する（バスト済みホストを除外）
       const activePlayers = game.players.filter((p) => p.chips > 0);
 
       if (nextHandReadyRef.current.size >= Math.max(activePlayers.length, 1)) {
@@ -238,6 +417,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       }
 
       const state = game.getState() as PokerState;
+      attachTournamentState(state);
       state.nextHandReady = Array.from(nextHandReadyRef.current);
       rtcRef.current?.broadcast({ type: 'game_update', state });
       setPokerState({ ...state });
@@ -250,9 +430,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       const game = gameRef.current;
       if (!game) return;
 
-      const playerIndex = game.players.findIndex(
-        (p) => p.id === data.playerId
-      );
+      clearActionTimer();
+
+      const playerIndex = game.players.findIndex((p) => p.id === data.playerId);
       if (playerIndex === -1) return;
 
       if (data.action === 'fold') game.fold(playerIndex);
@@ -261,22 +441,26 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       else if (data.action === 'bet') game.bet(playerIndex, data.amount ?? 0);
 
       const newState = game.getState() as PokerState;
+      attachTournamentState(newState);
+
+      if (newState.phase !== 'SHOWDOWN' && newState.phase !== 'WINNER') {
+        const deadline = Date.now() + 25000;
+        newState.turnDeadlineAt = deadline;
+        scheduleActionTimerRef.current(deadline, newState.turnIndex);
+      }
+
       rtcRef.current?.broadcast({ type: 'game_update', state: newState });
       setPokerState(newState);
 
-      // ホストは自分の broadcast を受け取らないため、ここでチップを更新
       const me = newState.players.find((p: Player) => p.id === myPlayerIdRef.current);
       if (me) myLastChipsRef.current = me.chips;
     },
     []
   );
 
-  // WebRTC メッセージハンドラ（ref 経由で常に最新を参照）
+  // WebRTC メッセージハンドラ
   const handleMessageImpl = (message: string) => {
-    const data = JSON.parse(message) as {
-      type: string;
-      [key: string]: unknown;
-    };
+    const data = JSON.parse(message) as { type: string; [key: string]: unknown };
 
     switch (data.type) {
       case 'join': {
@@ -286,18 +470,15 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         const newPlayer: Player = { id: playerId, name, chips: roomBuyinRef.current };
 
         if (isPlayingRef.current) {
-          // ゲーム進行中 → 待機キューへ追加し、次ハンドから参加
           pendingJoinsRef.current = [...pendingJoinsRef.current, { id: playerId, name, chips: roomBuyinRef.current }];
           allPlayersRef.current = [...allPlayersRef.current, newPlayer];
-          // 参加者にIDを通知（waiting UI 表示のため）
           rtcRef.current?.broadcast({ type: 'player_id', playerId, name });
-          // 参加者に現在のゲーム状態と次ハンド待ち状態を通知
           const currentState = gameRef.current?.getState() as PokerState | undefined;
           if (currentState) {
+            attachTournamentState(currentState);
             rtcRef.current?.broadcast({ type: 'game_update', state: currentState });
           }
         } else {
-          // 待機室 → 即座にプレイヤーリストへ追加
           const updated = [...roomPlayersRef.current, newPlayer];
           allPlayersRef.current = [...allPlayersRef.current, newPlayer];
           setRoomPlayersSync(updated);
@@ -308,6 +489,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
               buyin: roomBuyinRef.current,
               sb: sbRef.current,
               bb: bbRef.current,
+              tournamentConfig: tournamentConfigRef.current,
             },
           });
           rtcRef.current?.broadcast({ type: 'player_id', playerId, name });
@@ -327,17 +509,21 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           buyin?: number;
           sb?: number;
           bb?: number;
+          tournamentConfig?: TournamentConfig;
         };
         setRoomPlayersSync(rs.players);
         if (rs.buyin) {
           setRoomBuyinSync(rs.buyin);
-          // 初回受信時のみ playerTotalBuyin を設定（参加者側の初期バイイン）
           if (playerTotalBuyinRef.current === 0) {
             playerTotalBuyinRef.current = rs.buyin;
           }
         }
         if (rs.sb) setSbSync(rs.sb);
         if (rs.bb) setBbSync(rs.bb);
+        if (rs.tournamentConfig) {
+          tournamentConfigRef.current = rs.tournamentConfig;
+          setTournamentConfig(rs.tournamentConfig);
+        }
         break;
       }
 
@@ -346,15 +532,44 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         setBbSync(data.bb as number);
         break;
 
+      case 'tournament_progress': {
+        const prog = data.progress as TournamentProgress;
+        setTournamentProgressSync(prog);
+        break;
+      }
+
+      case 'spectator_update': {
+        const ids = data.spectatorIds as string[];
+        const newSet = new Set(ids);
+        setSpectatorIdsSync(newSet);
+        break;
+      }
+
+      case 'tournament_end': {
+        const ranks = data.rankList as TournamentRank[];
+        setRankListSync(ranks);
+        setShowTournamentResult(true);
+        break;
+      }
+
       case 'game_start':
         isPlayingRef.current = true;
         nextHandReadyRef.current.clear();
-        setPokerState(data.state as PokerState);
-        setScreen('playing');
+        {
+          const gs = data.state as PokerState;
+          if (gs.spectatorIds) setSpectatorIdsSync(new Set(gs.spectatorIds));
+          if (gs.tournamentProgress) setTournamentProgressSync(gs.tournamentProgress);
+          if (gs.handNumber !== undefined) handNumberRef.current = gs.handNumber;
+          setPokerState(gs);
+          setScreen('playing');
+        }
         break;
 
       case 'game_update': {
         const gs = data.state as PokerState;
+        if (gs.spectatorIds) setSpectatorIdsSync(new Set(gs.spectatorIds));
+        if (gs.tournamentProgress) setTournamentProgressSync(gs.tournamentProgress);
+        if (gs.handNumber !== undefined) handNumberRef.current = gs.handNumber;
         setPokerState(gs);
         if (gs.players) {
           setRoomPlayersSync(
@@ -364,7 +579,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
               chips: p.chips,
             }))
           );
-          // 自分のチップ数を別途保持（bust後もroomPlayersRefから消えるため）
           const me = gs.players.find((p: Player) => p.id === myPlayerIdRef.current);
           if (me) myLastChipsRef.current = me.chips;
         }
@@ -380,9 +594,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       }
 
       case 'game_over': {
+        clearActionTimer();
         isPlayingRef.current = false;
         setScreen('gameover');
-        // myLastChipsRef で精算（roomPlayersRef は bust 後更新されるため使わない）
         settleGameResult(myLastChipsRef.current).finally(() => {
           refreshProfileRef.current();
         });
@@ -390,6 +604,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       }
 
       case 'return_to_lobby': {
+        clearActionTimer();
+        clearLevelTimer();
         isPlayingRef.current = false;
         setPokerState(null);
         setCurrentRoomId(null);
@@ -400,6 +616,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         setIsHostSync(false);
         setMyPlayerIdSync(null);
         setMyPlayerNameSync(null);
+        tournamentConfigRef.current = null;
+        setTournamentConfig(null);
+        setTournamentProgressSync(null);
+        setSpectatorIdsSync(new Set());
+        setRankListSync([]);
+        handNumberRef.current = 0;
+        bustOrderRef.current = 0;
+        setShowTournamentResult(false);
         setScreen('setup');
         break;
       }
@@ -431,11 +655,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
             const gamePhase = (game as unknown as { phase: string }).phase;
             if (!player.folded && gamePhase !== 'WINNER' && gamePhase !== 'SHOWDOWN') {
               if ((game as unknown as { turnIndex: number }).turnIndex === idx) {
-                // 自分のターンならフォールド処理（turn を正しく進める）
                 player.chips = 0;
+                clearActionTimer();
                 game.fold(idx);
               } else {
-                // 自分のターン以外：直接フォールド済みにする
                 player.folded = true;
                 player.acted = true;
                 player.chips = 0;
@@ -447,6 +670,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         }
         const newState = game?.getState() as PokerState | undefined;
         if (newState && game) {
+          attachTournamentState(newState);
           rtcRef.current?.broadcast({ type: 'game_update', state: newState });
           setPokerState(newState);
           const remaining = game.players.filter((p) => p.chips > 0);
@@ -461,6 +685,15 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         if (!isHostRef.current) return;
         const playerId = data.playerId as string;
         const playerName = data.name as string;
+
+        // トーナメントModeでリエントリー締め切り後はリジェクト
+        const config = tournamentConfigRef.current;
+        const progress = tournamentProgressRef.current;
+        if (config?.enabled && progress && progress.currentLevel >= config.reentryUntilLevel) {
+          rtcRef.current?.broadcast({ type: 'reentry_rejected', playerId });
+          return;
+        }
+
         const reentryChips = roomBuyinRef.current;
         pendingReentriesRef.current = [
           ...pendingReentriesRef.current,
@@ -478,9 +711,19 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         const approvedId = data.playerId as string;
         if (approvedId === myPlayerIdRef.current) {
           const addedChips = data.chips as number;
-          // 累積バイイン更新（精算時に正しい損益を計算するため）
           playerTotalBuyinRef.current += addedChips;
           myLastChipsRef.current = addedChips;
+        }
+        break;
+      }
+
+      case 'reentry_rejected': {
+        const rejectedId = data.playerId as string;
+        if (rejectedId === myPlayerIdRef.current) {
+          // 観戦者として登録（自身側の処理）
+          const newSet = new Set(spectatorIdsRef.current);
+          newSet.add(rejectedId);
+          setSpectatorIdsSync(newSet);
         }
         break;
       }
@@ -496,13 +739,25 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   // ルーム作成
   const createRoom = useCallback(
-    async (buyinVal: number, sbVal: number, bbVal: number) => {
+    async (buyinVal: number, sbVal: number, bbVal: number, tConfig?: TournamentConfig) => {
       const name = await getPlayerName();
       setMyPlayerNameSync(name);
       setIsHostSync(true);
       setRoomBuyinSync(buyinVal);
       setSbSync(sbVal);
       setBbSync(bbVal);
+
+      if (tConfig) {
+        tournamentConfigRef.current = tConfig;
+        setTournamentConfig(tConfig);
+        const initialProgress: TournamentProgress = {
+          currentLevel: 0,
+          levelStartedAt: 0,
+          isPaused: false,
+          pausedRemaining: 0,
+        };
+        setTournamentProgressSync(initialProgress);
+      }
 
       const { WebRTCManager } = await import('@/lib/webrtc');
       const rtc = new WebRTCManager(true);
@@ -514,7 +769,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       setMyPlayerIdSync(playerId);
       setCurrentRoomId(roomId);
 
-      // ルームメタ情報を RTDB に保存
       try {
         const { ref, set } = await import('firebase/database');
         const { db } = await import('@/lib/firebase');
@@ -526,8 +780,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           hostUid: auth.currentUser?.uid ?? '',
           hostName: name,
           createdAt: Date.now(),
+          ...(tConfig ? { tournamentConfig: tConfig } : {}),
         });
-        // プロフィールの activeRoomId を更新
         const { firestore } = await import('@/lib/firebase');
         const { doc, updateDoc } = await import('firebase/firestore');
         const uid = auth.currentUser?.uid;
@@ -566,7 +820,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
       await rtc.joinRoom(roomId);
 
-      // プロフィールの activeRoomId を更新
       try {
         const { auth, firestore } = await import('@/lib/firebase');
         const { doc, updateDoc } = await import('firebase/firestore');
@@ -594,19 +847,42 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // 初期チップを記録
     myLastChipsRef.current = roomBuyinRef.current;
-
     isPlayingRef.current = true;
+    handNumberRef.current = 1;
 
-    const game = new PokerGame(players, sbRef.current, bbRef.current);
+    const config = tournamentConfigRef.current;
+    const currentBlindLevel = config?.enabled ? config.blindLevels[0] : null;
+    const ante = currentBlindLevel?.ante ?? 0;
+
+    const game = new PokerGame(players, sbRef.current, bbRef.current, { ante });
     gameRef.current = game;
     game.start();
 
+    // トーナメントタイマー開始
+    if (config?.enabled) {
+      const initialProgress: TournamentProgress = {
+        currentLevel: 0,
+        levelStartedAt: Date.now(),
+        isPaused: false,
+        pausedRemaining: 0,
+      };
+      setTournamentProgressSync(initialProgress);
+      rtcRef.current?.broadcast({ type: 'tournament_progress', progress: initialProgress });
+      // タイマーは次のtickで scheduleLevelTimerRef.current() を呼ぶ
+      setTimeout(() => scheduleLevelTimerRef.current(), 0);
+    }
+
     const state = game.getState() as PokerState;
+    attachTournamentState(state);
+    const deadline = Date.now() + 25000;
+    state.turnDeadlineAt = deadline;
+
     rtcRef.current?.broadcast({ type: 'game_start', state });
     setPokerState(state);
     setScreen('playing');
+
+    scheduleActionTimerRef.current(deadline, state.turnIndex);
   }, []);
 
   // アクション送信
@@ -642,10 +918,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   // ゲーム再スタート（ロビーへ戻す）
   const restartGame = useCallback(() => {
+    clearActionTimer();
+    clearLevelTimer();
     if (isHostRef.current && rtcRef.current) {
       rtcRef.current.broadcast({ type: 'return_to_lobby' });
     }
-    // ルームメタを削除
     import('@/lib/firebase').then(({ db }) => {
       import('firebase/database').then(({ ref, remove }) => {
         if (currentRoomId) remove(ref(db, `roomMeta/${currentRoomId}`));
@@ -660,6 +937,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setIsHostSync(false);
     setMyPlayerIdSync(null);
     setMyPlayerNameSync(null);
+    tournamentConfigRef.current = null;
+    setTournamentConfig(null);
+    setTournamentProgressSync(null);
+    setSpectatorIdsSync(new Set());
+    setRankListSync([]);
+    handNumberRef.current = 0;
+    bustOrderRef.current = 0;
+    setShowTournamentResult(false);
     setScreen('setup');
   }, [currentRoomId]);
 
@@ -672,6 +957,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   // 途中退席
   const leaveGame = useCallback(async () => {
+    clearActionTimer();
+    clearLevelTimer();
     await settleGameResult(myLastChipsRef.current);
     refreshProfileRef.current();
     if (!isHostRef.current) {
@@ -689,23 +976,41 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setIsHostSync(false);
     setMyPlayerIdSync(null);
     setMyPlayerNameSync(null);
+    tournamentConfigRef.current = null;
+    setTournamentConfig(null);
+    setTournamentProgressSync(null);
+    setSpectatorIdsSync(new Set());
+    setRankListSync([]);
+    handNumberRef.current = 0;
+    bustOrderRef.current = 0;
+    setShowTournamentResult(false);
     setScreen('setup');
   }, []);
 
   // リエントリー / 途中参加リクエスト
   const requestReentry = useCallback(() => {
     if (isHostRef.current) {
-      // ホストはローカルでキューへ直接追加（sendする相手がいないため）
       const id = myPlayerIdRef.current;
       const name = myPlayerNameRef.current;
       if (!id || !name) return;
+
+      // トーナメントModeでリエントリー締め切り後は観戦者へ
+      const config = tournamentConfigRef.current;
+      const progress = tournamentProgressRef.current;
+      if (config?.enabled && progress && progress.currentLevel >= config.reentryUntilLevel) {
+        const newSet = new Set(spectatorIdsRef.current);
+        newSet.add(id);
+        setSpectatorIdsSync(newSet);
+        rtcRef.current?.broadcast({ type: 'spectator_update', spectatorIds: [...newSet] });
+        return;
+      }
+
       if (!pendingJoinsRef.current.find((p) => p.id === id)) {
         pendingJoinsRef.current = [
           ...pendingJoinsRef.current,
           { id, name, chips: roomBuyinRef.current },
         ];
       }
-      // 累積バイイン更新
       playerTotalBuyinRef.current += roomBuyinRef.current;
       myLastChipsRef.current = roomBuyinRef.current;
     } else {
@@ -715,6 +1020,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         name: myPlayerNameRef.current,
       });
     }
+  }, []);
+
+  const dismissTournamentResult = useCallback(() => {
+    setShowTournamentResult(false);
   }, []);
 
   return (
@@ -730,6 +1039,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         sb,
         bb,
         pokerState,
+        tournamentConfig,
+        tournamentProgress,
+        spectatorIds,
+        rankList,
+        showTournamentResult,
         createRoom,
         joinRoom,
         startGame,
@@ -739,6 +1053,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         updateBlinds,
         leaveGame,
         requestReentry,
+        dismissTournamentResult,
       }}
     >
       {children}

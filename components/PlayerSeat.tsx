@@ -9,10 +9,19 @@ interface Props {
   x: number;
   y: number;
   revealedHand?: Card[];
+  bb?: number;
+  stackUnit?: 'chips' | 'bb';
 }
 
 function suitColor(suit: string) {
   return suit === '♥' || suit === '♦' ? '#e74c3c' : '#111111';
+}
+
+export function formatStack(chips: number, bb: number, unit: 'chips' | 'bb'): string {
+  if (unit === 'bb') {
+    return `${(chips / bb).toFixed(1)}BB`;
+  }
+  return chips.toLocaleString();
 }
 
 export default function PlayerSeat({
@@ -22,7 +31,11 @@ export default function PlayerSeat({
   x,
   y,
   revealedHand,
+  bb = 20,
+  stackUnit = 'chips',
 }: Props) {
+  const isShortStack = player.chips > 0 && player.chips < bb * 10;
+
   const classes = [
     'opponent',
     isActive ? 'is-active' : '',
@@ -38,7 +51,12 @@ export default function PlayerSeat({
       <div className="opponent-box">
         <span className="dealer-chip">D</span>
         <span className="opponent-name">{player.name}</span>
-        <span className="opponent-stack">${player.chips}</span>
+        <span
+          className="opponent-stack"
+          style={isShortStack ? { color: '#ef4444' } : undefined}
+        >
+          {formatStack(player.chips, bb, stackUnit)}
+        </span>
         {player.folded ? (
           <span className="opponent-action opponent-action-fold">FOLD</span>
         ) : player.lastAction ? (

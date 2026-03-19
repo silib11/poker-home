@@ -28,7 +28,7 @@ function checkStraightFlush(cards) {
 }
 
 export class PokerGame {
-    constructor(players, sb, bb) {
+    constructor(players, sb, bb, options = {}) {
         this.players = players.map((p, i) => ({
             ...p,
             hand: [],
@@ -41,6 +41,7 @@ export class PokerGame {
         }));
         this.sb = sb;
         this.bb = bb;
+        this.ante = options.ante || 0;
         this.deck = [];
         this.community = [];
         this.pot = 0;
@@ -84,26 +85,62 @@ export class PokerGame {
             p.totalBetThisHand = 0;
         });
         this.allInRunout = false;
-        
-        // ブラインド設定
-        const sbIndex = (this.dealerIndex + 1) % this.players.length;
-        const bbIndex = (this.dealerIndex + 2) % this.players.length;
-        
-        const sbAmount = Math.min(this.sb, this.players[sbIndex].chips);
-        this.players[sbIndex].chips -= sbAmount;
-        this.players[sbIndex].bet = sbAmount;
-        this.players[sbIndex].totalBetThisHand = sbAmount;
-        this.players[sbIndex].acted = false;
-        
-        const bbAmount = Math.min(this.bb, this.players[bbIndex].chips);
-        this.players[bbIndex].chips -= bbAmount;
-        this.players[bbIndex].bet = bbAmount;
-        this.players[bbIndex].totalBetThisHand = bbAmount;
-        this.players[bbIndex].acted = false;
-        
-        this.currentBet = this.bb;
-        this.lastRaiserIndex = -1;
-        this.turnIndex = (bbIndex + 1) % this.players.length;
+
+        const isHeadsUp = this.players.length === 2;
+
+        // アンティ徴収（SB/BBより前）
+        if (this.ante > 0) {
+            this.players.forEach(p => {
+                const anteAmount = Math.min(this.ante, p.chips);
+                p.chips -= anteAmount;
+                p.totalBetThisHand += anteAmount;
+                this.pot += anteAmount;
+            });
+        }
+
+        if (isHeadsUp) {
+            // ヘッズアップルール: ディーラー = SB、相手 = BB
+            // PREFLOP: SB(ディーラー)が先にアクション
+            const sbIndex = this.dealerIndex;
+            const bbIndex = (this.dealerIndex + 1) % 2;
+
+            const sbAmount = Math.min(this.sb, this.players[sbIndex].chips);
+            this.players[sbIndex].chips -= sbAmount;
+            this.players[sbIndex].bet = sbAmount;
+            this.players[sbIndex].totalBetThisHand += sbAmount;
+            this.players[sbIndex].acted = false;
+
+            const bbAmount = Math.min(this.bb, this.players[bbIndex].chips);
+            this.players[bbIndex].chips -= bbAmount;
+            this.players[bbIndex].bet = bbAmount;
+            this.players[bbIndex].totalBetThisHand += bbAmount;
+            this.players[bbIndex].acted = false;
+
+            this.currentBet = this.bb;
+            this.lastRaiserIndex = -1;
+            // ヘッズアップPREFLOP: SB(ディーラー)から先にアクション
+            this.turnIndex = sbIndex;
+        } else {
+            // 通常ルール
+            const sbIndex = (this.dealerIndex + 1) % this.players.length;
+            const bbIndex = (this.dealerIndex + 2) % this.players.length;
+            
+            const sbAmount = Math.min(this.sb, this.players[sbIndex].chips);
+            this.players[sbIndex].chips -= sbAmount;
+            this.players[sbIndex].bet = sbAmount;
+            this.players[sbIndex].totalBetThisHand += sbAmount;
+            this.players[sbIndex].acted = false;
+            
+            const bbAmount = Math.min(this.bb, this.players[bbIndex].chips);
+            this.players[bbIndex].chips -= bbAmount;
+            this.players[bbIndex].bet = bbAmount;
+            this.players[bbIndex].totalBetThisHand += bbAmount;
+            this.players[bbIndex].acted = false;
+            
+            this.currentBet = this.bb;
+            this.lastRaiserIndex = -1;
+            this.turnIndex = (bbIndex + 1) % this.players.length;
+        }
         
         // 手札配布
         this.players.forEach(p => {

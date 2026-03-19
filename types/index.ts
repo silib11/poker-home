@@ -10,6 +10,9 @@ export interface Player {
   position?: number;
   acted?: boolean;
   totalBetThisHand?: number;
+  isSpectator?: boolean;
+  bustLevel?: number;
+  bustOrder?: number;
 }
 
 export interface Card {
@@ -40,6 +43,10 @@ export interface PokerState {
   potResults?: PotResult[];
   nextHandReady?: string[];
   allInRunout?: boolean;
+  spectatorIds?: string[];
+  handNumber?: number;
+  turnDeadlineAt?: number;
+  tournamentProgress?: TournamentProgress;
 }
 
 export interface RoomState {
@@ -77,4 +84,34 @@ export interface RoomMeta {
   hostUid: string;
   hostName: string;
   createdAt: number;
+  tournamentConfig?: TournamentConfig;
+}
+
+export interface BlindLevel {
+  level: number;
+  sb: number;
+  bb: number;
+  ante: number;
+  durationMinutes: number;
+}
+
+export interface TournamentConfig {
+  enabled: boolean;
+  blindLevels: BlindLevel[];
+  reentryUntilLevel: number;
+}
+
+export interface TournamentProgress {
+  currentLevel: number;
+  levelStartedAt: number;
+  isPaused: boolean;
+  pausedRemaining: number;
+}
+
+export interface TournamentRank {
+  rank: number;
+  playerId: string;
+  playerName: string;
+  bustLevel: number;
+  bustHandNumber: number;
 }
