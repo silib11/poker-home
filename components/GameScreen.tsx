@@ -136,10 +136,11 @@ export default function GameScreen() {
     const timers: ReturnType<typeof setTimeout>[] = [];
     let delay = 0;
 
-    // オールインランナウト時は手札をすぐに公開
+    // オールインランナウト時は手札をすぐに公開し、2.5秒後からフェーズ進行
     const isAllInRunout = !!pokerState.allInRunout;
     if (isAllInRunout) {
       timers.push(setTimeout(() => setShowTableHands(true), 0));
+      delay += 2500;
     }
 
     for (let i = 0; i < phases.length; i++) {
