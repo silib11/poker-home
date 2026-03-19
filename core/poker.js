@@ -51,6 +51,7 @@ export class PokerGame {
         this.lastRaiserIndex = -1;
         this.sidePots = [];
         this.potResults = [];
+        this.allInRunout = false;
     }
 
     // 山札生成
@@ -82,6 +83,7 @@ export class PokerGame {
         this.players.forEach(p => {
             p.totalBetThisHand = 0;
         });
+        this.allInRunout = false;
         
         // ブラインド設定
         const sbIndex = (this.dealerIndex + 1) % this.players.length;
@@ -271,6 +273,7 @@ export class PokerGame {
         const activePlayers = this.players.filter(p => !p.folded);
         const playersCanAct = activePlayers.filter(p => p.chips > 0);
         if (playersCanAct.length <= 1 && this.phase !== 'SHOWDOWN') {
+            this.allInRunout = true;
             this.nextPhase();
         }
     }
@@ -557,7 +560,8 @@ export class PokerGame {
             winAmount: this.winAmount,
             winningHand: this.winningHand,
             sidePots: this.sidePots,
-            potResults: this.potResults
+            potResults: this.potResults,
+            allInRunout: this.allInRunout
         };
     }
 

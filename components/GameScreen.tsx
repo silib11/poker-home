@@ -136,6 +136,12 @@ export default function GameScreen() {
     const timers: ReturnType<typeof setTimeout>[] = [];
     let delay = 0;
 
+    // オールインランナウト時は手札をすぐに公開
+    const isAllInRunout = !!pokerState.allInRunout;
+    if (isAllInRunout) {
+      timers.push(setTimeout(() => setShowTableHands(true), 0));
+    }
+
     for (let i = 0; i < phases.length; i++) {
       const phase = phases[i];
       const isLast = i === phases.length - 1;
@@ -176,31 +182,45 @@ export default function GameScreen() {
         );
         delay += 500;
 
-        // バナーを消してテーブル上で手札を公開（1.5秒）
-        const d4 = delay;
-        timers.push(
-          setTimeout(() => {
-            setPhaseBanner(null);
-            setShowTableHands(true);
-          }, d4)
-        );
-        delay += 1500;
+        if (isAllInRunout) {
+          // オールインランナウト: 手札はすでに公開済みなのでバナーを消してそのまま ShowdownView へ遷移
+          const d4 = delay;
+          timers.push(
+            setTimeout(() => {
+              setPhaseBanner(null);
+              setShowTableHands(false);
+              setShowShowdownHands(true);
+              setShowShowdownResult(true);
+              setIsAnimating(false);
+            }, d4)
+          );
+        } else {
+          // 通常のショウダウン: バナーを消してテーブル上で手札を公開（1.5秒）
+          const d4 = delay;
+          timers.push(
+            setTimeout(() => {
+              setPhaseBanner(null);
+              setShowTableHands(true);
+            }, d4)
+          );
+          delay += 1500;
 
-        // ShowdownView（結果ページ）へ遷移
-        const d5 = delay;
-        timers.push(
-          setTimeout(() => {
-            setShowTableHands(false);
-            setShowShowdownHands(true);
-            setShowShowdownResult(true);
-            setIsAnimating(false);
-          }, d5)
-        );
+          // ShowdownView（結果ページ）へ遷移
+          const d5 = delay;
+          timers.push(
+            setTimeout(() => {
+              setShowTableHands(false);
+              setShowShowdownHands(true);
+              setShowShowdownResult(true);
+              setIsAnimating(false);
+            }, d5)
+          );
+        }
       }
     }
 
     animTimersRef.current = timers;
-  }, [pokerState?.phase, pokerState?.community?.length]);
+  }, [pokerState?.phase, pokerState?.community?.length, pokerState?.allInRunout]);
 
   // アンマウント時にタイマーをクリア
   useEffect(() => {

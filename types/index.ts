@@ -39,6 +39,7 @@ export interface PokerState {
   winningHand?: string;
   potResults?: PotResult[];
   nextHandReady?: string[];
+  allInRunout?: boolean;
 }
 
 export interface RoomState {

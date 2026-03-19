@@ -12,7 +12,7 @@ interface Props {
 }
 
 function suitColor(suit: string) {
-  return suit === '♥' || suit === '♦' ? '#e74c3c' : '#f0f0f0';
+  return suit === '♥' || suit === '♦' ? '#e74c3c' : '#111111';
 }
 
 export default function PlayerSeat({

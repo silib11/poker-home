@@ -16,6 +16,11 @@ export function getOpponentPositions(
   const positions: Position[] = [];
   const opponentCount = count - 1;
 
+  // opponent-box の高さ（名前+スタック+カード等）は約 90px、
+  // transform: translate(-50%, -50%) で中心配置するため
+  // y が小さすぎるとボックス上部が画面外にはみ出してクリップされる
+  const MIN_Y = 72;
+
   for (let i = 0; i < opponentCount; i++) {
     const startAngle = 200;
     const endAngle = 340;
@@ -24,7 +29,7 @@ export function getOpponentPositions(
       (startAngle + (angleRange / (opponentCount + 1)) * (i + 1)) *
       (Math.PI / 180);
     const x = centerX + radiusX * Math.cos(angle);
-    const y = centerY + radiusY * Math.sin(angle);
+    const y = Math.max(centerY + radiusY * Math.sin(angle), MIN_Y);
     positions.push({ x, y });
   }
 
