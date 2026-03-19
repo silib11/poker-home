@@ -255,6 +255,11 @@ input {
     height: calc(100vh - 44px);
 }
 
+#game-screen.playing #game-area {
+    margin-top: 0;
+    height: 100vh;
+}
+
 #game-area button {
     padding: 10px;
     font-size: 14px;
