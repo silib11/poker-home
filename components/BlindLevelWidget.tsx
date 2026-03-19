@@ -7,12 +7,14 @@ interface BlindLevelWidgetProps {
   tournamentConfig: TournamentConfig | null;
   tournamentProgress: TournamentProgress | null;
   handNumber?: number;
+  compact?: boolean;
 }
 
 export default function BlindLevelWidget({
   tournamentConfig,
   tournamentProgress,
   handNumber,
+  compact = false,
 }: BlindLevelWidgetProps) {
   const [remaining, setRemaining] = useState<number>(0);
 
@@ -52,12 +54,12 @@ export default function BlindLevelWidget({
         transform: 'translateX(-50%)',
         display: 'flex',
         alignItems: 'center',
-        gap: '10px',
+        gap: compact ? '7px' : '10px',
         background: 'rgba(0,0,0,0.7)',
         backdropFilter: 'blur(10px)',
         border: '1px solid rgba(245,158,11,0.3)',
         borderRadius: '12px',
-        padding: '6px 14px',
+        padding: compact ? '5px 10px' : '6px 14px',
         zIndex: 50,
         whiteSpace: 'nowrap',
       }}
@@ -66,7 +68,7 @@ export default function BlindLevelWidget({
         <div style={{ fontSize: '10px', color: '#f59e0b', fontWeight: '700', letterSpacing: '1px' }}>
           LEVEL {levelDef.level}
         </div>
-        <div style={{ fontSize: '13px', fontWeight: '800', color: '#fff' }}>
+        <div style={{ fontSize: compact ? '12px' : '13px', fontWeight: '800', color: '#fff' }}>
           {levelDef.sb}/{levelDef.bb}
           {levelDef.ante > 0 && (
             <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', marginLeft: '4px' }}>
@@ -80,11 +82,11 @@ export default function BlindLevelWidget({
 
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', letterSpacing: '1px' }}>
-          NEXT LEVEL
+          {compact ? 'NEXT' : 'NEXT LEVEL'}
         </div>
         <div
           style={{
-            fontSize: '13px',
+            fontSize: compact ? '12px' : '13px',
             fontWeight: '800',
             color: timerColor,
             opacity: blink ? 0.4 : 1,
@@ -95,7 +97,7 @@ export default function BlindLevelWidget({
         </div>
       </div>
 
-      {nextLevelDef && (
+      {!compact && nextLevelDef && (
         <>
           <div style={{ width: '1px', height: '28px', background: 'rgba(255,255,255,0.1)' }} />
           <div style={{ textAlign: 'center' }}>
@@ -107,7 +109,7 @@ export default function BlindLevelWidget({
         </>
       )}
 
-      {handNumber !== undefined && handNumber > 0 && (
+      {!compact && handNumber !== undefined && handNumber > 0 && (
         <>
           <div style={{ width: '1px', height: '28px', background: 'rgba(255,255,255,0.1)' }} />
           <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>

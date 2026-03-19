@@ -85,6 +85,7 @@ export default function GameScreen() {
             tournamentConfig={tournamentConfig}
             tournamentProgress={tournamentProgress}
             handNumber={state.handNumber}
+            compact={width <= 480}
           />
         )}
 
@@ -223,6 +224,7 @@ export default function GameScreen() {
             tournamentConfig={tournamentConfig}
             tournamentProgress={tournamentProgress}
             handNumber={state.handNumber}
+            compact={width <= 480}
           />
         )}
         <div
@@ -274,6 +276,7 @@ export default function GameScreen() {
             tournamentConfig={tournamentConfig}
             tournamentProgress={tournamentProgress}
             handNumber={state.handNumber}
+            compact={width <= 480}
           />
         )}
         <div id="game-area" style={{ marginTop: 0, height: 'auto' }}>
@@ -295,6 +298,7 @@ export default function GameScreen() {
             tournamentConfig={tournamentConfig}
             tournamentProgress={tournamentProgress}
             handNumber={state.handNumber}
+            compact={width <= 480}
           />
         )}
         <div id="game-area" style={{ marginTop: 0, height: 'auto' }}>
@@ -339,6 +343,7 @@ export default function GameScreen() {
           tournamentConfig={tournamentConfig}
           tournamentProgress={tournamentProgress}
           handNumber={state.handNumber}
+          compact={width <= 480}
         />
       )}
 
