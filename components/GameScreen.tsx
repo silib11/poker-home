@@ -394,13 +394,14 @@ export default function GameScreen() {
             </div>
           </div>
 
-          {/* アニメーション中はアクションパネルを非表示（ただし手札公開中は表示して自分の手札を見せる） */}
+          {/* アニメーション中はアクションパネルを非表示（ただし手札公開中は手札部分だけ表示） */}
           {(!isAnimating || showTableHands) && (
             <ActionPanel
               state={state}
               myPlayer={myPlayer}
               myIndex={myIndex}
               onToggleRanking={() => setShowRanking((v) => !v)}
+              hideActions={isAnimating}
             />
           )}
 

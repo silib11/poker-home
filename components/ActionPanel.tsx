@@ -17,6 +17,7 @@ interface Props {
   myPlayer: Player | undefined;
   myIndex: number;
   onToggleRanking: () => void;
+  hideActions?: boolean;
 }
 
 export default function ActionPanel({
@@ -24,6 +25,7 @@ export default function ActionPanel({
   myPlayer,
   myIndex,
   onToggleRanking,
+  hideActions = false,
 }: Props) {
   const { sendAction } = useGame();
   const isTurn = myIndex === state.turnIndex;
@@ -180,7 +182,7 @@ export default function ActionPanel({
 
       <div className="bottom-area">
         {/* ベットスライダー */}
-        {showSlider && (
+        {!hideActions && showSlider && (
           <div className="slider-area">
             <div className="slider-header">
               <span className="slider-label">BET AMOUNT</span>
@@ -270,7 +272,7 @@ export default function ActionPanel({
 
           {/* アクションボタン */}
           <div className="action-area">
-            {isTurn && myPlayer && !myPlayer.folded ? (
+            {!hideActions && isTurn && myPlayer && !myPlayer.folded ? (
               <>
                 <div className="my-turn-banner">YOUR TURN</div>
                 <button
