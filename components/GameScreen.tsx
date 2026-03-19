@@ -394,8 +394,8 @@ export default function GameScreen() {
             </div>
           </div>
 
-          {/* アニメーション中はアクションパネルを非表示 */}
-          {!isAnimating && (
+          {/* アニメーション中はアクションパネルを非表示（ただし手札公開中は表示して自分の手札を見せる） */}
+          {(!isAnimating || showTableHands) && (
             <ActionPanel
               state={state}
               myPlayer={myPlayer}
