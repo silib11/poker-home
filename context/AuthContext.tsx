@@ -6,7 +6,6 @@ import React, {
   useState,
   useEffect,
   useCallback,
-  useRef,
 } from 'react';
 import {
   onAuthStateChanged,
@@ -26,14 +25,8 @@ import {
   where,
   getDocs,
 } from 'firebase/firestore';
-import { runTransaction, ref, set, get, remove, onDisconnect } from 'firebase/database';
-import { auth, firestore, db } from '@/lib/firebase';
-import type { UserProfile, GameResult, UserSession } from '@/types';
-import {
-  SESSION_TTL_MS as TTL,
-  SESSION_HEARTBEAT_INTERVAL_MS as HEARTBEAT_INTERVAL,
-  ERROR_ALREADY_LOGGED_IN as ALREADY_LOGGED_IN,
-} from '@/types';
+import { auth, firestore } from '@/lib/firebase';
+import type { UserProfile, GameResult } from '@/types';
 
 interface AuthContextType {
   user: User | null;
@@ -44,129 +37,23 @@ interface AuthContextType {
   logIn: (email: string, password: string) => Promise<void>;
   logOut: () => Promise<void>;
   updatePlayerName: (name: string) => Promise<void>;
-  topUpChips: (amount: number) => Promise<void>;
-  saveGameResult: (roomId: string, buyin: number, finalStack: number) => Promise<void>;
+  saveGameResult: (totalBuyin: number, finalStack: number, roomId: string) => Promise<void>;
   addFriend: (friendUid: string) => Promise<void>;
   removeFriend: (friendUid: string) => Promise<void>;
   setActiveRoom: (roomId: string | null) => Promise<void>;
   getFriendProfiles: () => Promise<Array<{ uid: string; playerName: string; activeRoomId: string | null }>>;
+  getGameResults: () => Promise<GameResult[]>;
   refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
-
-const INITIAL_CHIPS = 5000;
-
-const SESSION_STORAGE_KEY_PREFIX = 'poker_session_';
-const DEVICE_STORAGE_KEY = 'poker_device_id';
-const PERMISSION_RETRY_DELAY_MS = 500;
-const inFlightSessionClaims = new Map<string, Promise<{ success: true; sessionId: string } | { success: false }>>();
-function sessionStorageKey(uid: string): string {
-  return `${SESSION_STORAGE_KEY_PREFIX}${uid}`;
-}
-
-function getStoredSessionId(uid: string): string | null {
-  if (typeof sessionStorage === 'undefined') return null;
-  return sessionStorage.getItem(sessionStorageKey(uid));
-}
-
-function storeSessionId(uid: string, sessionId: string): void {
-  sessionStorage?.setItem(sessionStorageKey(uid), sessionId);
-}
-
-function clearSessionStorage(uid: string): void {
-  sessionStorage?.removeItem(sessionStorageKey(uid));
-}
-
-function getDeviceId(): string {
-  if (typeof localStorage === 'undefined') return 'server';
-  const existing = localStorage.getItem(DEVICE_STORAGE_KEY);
-  if (existing) return existing;
-  const next = crypto.randomUUID();
-  localStorage.setItem(DEVICE_STORAGE_KEY, next);
-  return next;
-}
-
-function sessionRef(uid: string) {
-  return ref(db, `userSessions/${uid}`);
-}
-
-function isPermissionDenied(err: unknown): boolean {
-  const e = err as { code?: string; message?: string };
-  return e?.code === 'PERMISSION_DENIED' || /permission_denied/i.test(String(e?.message ?? ''));
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function ensureAuthToken(uid: string): Promise<void> {
-  if (auth.currentUser?.uid !== uid) return;
-  await auth.currentUser.getIdToken();
-}
-
-/** 既存セッションが有効なら取得せず失敗。期限切れか空なら自セッションで取得。 */
-async function claimSession(uid: string, deviceId: string): Promise<{ success: true; sessionId: string } | { success: false }> {
-  const sessionId = crypto.randomUUID();
-  const now = Date.now();
-  const result = await runTransaction(sessionRef(uid), (current: UserSession | null) => {
-    if (current && current.lastSeen && now - current.lastSeen < TTL && current.deviceId !== deviceId) {
-      return undefined; // abort transaction → we treat as "already active"
-    }
-    const next: UserSession = {
-      sessionId: current?.deviceId === deviceId ? current.sessionId : sessionId,
-      deviceId,
-      lastSeen: now,
-      activeRoomId: current?.deviceId === deviceId ? current.activeRoomId : null,
-      status: 'online',
-    };
-    return next;
-  });
-  if (result.committed) {
-    const data = result.snapshot.val() as UserSession | null;
-    return { success: true, sessionId: data?.sessionId ?? sessionId };
-  }
-  return { success: false };
-}
-
-/** ログイン直後は Realtime Database に認証が伝播するまで一瞬かかることがあるため、permission_denied 時に1回だけリトライする。 */
-async function claimSessionWithRetry(uid: string, deviceId: string): Promise<{ success: true; sessionId: string } | { success: false }> {
-  try {
-    return await claimSession(uid, deviceId);
-  } catch (err) {
-    if (!isPermissionDenied(err)) throw err;
-    await sleep(PERMISSION_RETRY_DELAY_MS);
-    return await claimSession(uid, deviceId);
-  }
-}
-
-/**
- * signInWithEmailAndPassword() と onAuthStateChanged() が同時に走るため、
- * 同じ UID へのセッション確保トランザクションは 1 本にまとめる。
- */
-async function claimSessionForUser(user: User): Promise<{ success: true; sessionId: string } | { success: false }> {
-  const existing = inFlightSessionClaims.get(user.uid);
-  if (existing) return existing;
-
-  const promise = (async () => {
-    await ensureAuthToken(user.uid);
-    return await claimSessionWithRetry(user.uid, getDeviceId());
-  })().finally(() => {
-    inFlightSessionClaims.delete(user.uid);
-  });
-
-  inFlightSessionClaims.set(user.uid, promise);
-  return await promise;
-}
 
 function buildInitialProfile(uid: string, email: string, playerName: string): Omit<UserProfile, 'createdAt' | 'updatedAt'> {
   return {
     uid,
     email,
     playerName,
-    chipBalance: INITIAL_CHIPS,
     lifetimeProfit: 0,
-    totalTopUp: 0,
     friendIds: [],
     activeRoomId: null,
   };
@@ -177,138 +64,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
-  const currentSessionIdRef = useRef<string | null>(null);
 
   const loadProfile = useCallback(async (uid: string) => {
     setProfileLoading(true);
     try {
-      await ensureAuthToken(uid);
-      let snap;
-      try {
-        snap = await getDoc(doc(firestore, 'users', uid));
-      } catch (err) {
-        if (!isPermissionDenied(err)) throw err;
-        await sleep(PERMISSION_RETRY_DELAY_MS);
-        await ensureAuthToken(uid);
-        snap = await getDoc(doc(firestore, 'users', uid));
-      }
+      const snap = await getDoc(doc(firestore, 'users', uid));
       if (snap.exists()) {
         setProfile(snap.data() as UserProfile);
       }
-    } catch (err) {
-      throw err;
     } finally {
       setProfileLoading(false);
     }
-  }, []);
-
-  const clearSessionOnServer = useCallback(async (uid: string) => {
-    try {
-      await remove(sessionRef(uid));
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  const setupOnDisconnect = useCallback((uid: string) => {
-    onDisconnect(sessionRef(uid)).remove().catch(() => {});
   }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       if (!u) {
-        currentSessionIdRef.current = null;
         setProfile(null);
         setAuthLoading(false);
         return;
       }
-      const uid = u.uid;
-      try {
-        const storedId = getStoredSessionId(uid);
-        if (storedId) {
-          try {
-            const snap = await get(sessionRef(uid));
-            const data = snap.val() as UserSession | null;
-            const now = Date.now();
-            if (
-              data &&
-              data.sessionId === storedId &&
-              data.lastSeen &&
-              now - data.lastSeen < TTL
-            ) {
-              currentSessionIdRef.current = storedId;
-              await loadProfile(uid);
-              setAuthLoading(false);
-              return;
-            }
-            if (
-              data &&
-              data.deviceId === getDeviceId() &&
-              data.lastSeen &&
-              now - data.lastSeen < TTL
-            ) {
-              storeSessionId(uid, data.sessionId);
-              currentSessionIdRef.current = data.sessionId;
-              await loadProfile(uid);
-              setAuthLoading(false);
-              return;
-            }
-          } catch (getErr) {
-            if (!isPermissionDenied(getErr)) throw getErr;
-          }
-          clearSessionStorage(uid);
-          currentSessionIdRef.current = null;
-        }
-        const result = await claimSessionForUser(u);
-        if (!result.success) {
-          await signOut(auth);
-          clearSessionStorage(uid);
-          currentSessionIdRef.current = null;
-          setProfile(null);
-          setAuthLoading(false);
-          return;
-        }
-        storeSessionId(uid, result.sessionId);
-        currentSessionIdRef.current = result.sessionId;
-        setupOnDisconnect(uid);
-        await loadProfile(uid);
-        setAuthLoading(false);
-      } catch (err) {
-        if (isPermissionDenied(err)) {
-          clearSessionStorage(uid);
-          currentSessionIdRef.current = null;
-          await loadProfile(uid);
-          setAuthLoading(false);
-          return;
-        }
-        setAuthLoading(false);
-        throw err;
-      }
+      await loadProfile(u.uid);
+      setAuthLoading(false);
     });
     return unsubscribe;
-  }, [loadProfile, setupOnDisconnect]);
-
-  useEffect(() => {
-    if (!user) return;
-    const uid = user.uid;
-    const tick = () => {
-      const sid = currentSessionIdRef.current ?? getStoredSessionId(uid);
-      if (!sid) return;
-      const now = Date.now();
-      const payload: UserSession = {
-        sessionId: sid,
-        deviceId: getDeviceId(),
-        lastSeen: now,
-        activeRoomId: profile?.activeRoomId ?? null,
-        status: 'online',
-      };
-      set(sessionRef(uid), payload).catch(() => {});
-    };
-    const id = setInterval(tick, HEARTBEAT_INTERVAL);
-    tick();
-    return () => clearInterval(id);
-  }, [user?.uid, profile?.activeRoomId]);
+  }, [loadProfile]);
 
   const signUp = useCallback(
     async (email: string, password: string, playerName: string) => {
@@ -320,7 +101,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updatedAt: now,
       };
       await setDoc(doc(firestore, 'users', cred.user.uid), initial);
-      // DB に書いた直後に loadProfile で反映（onAuthStateChanged の loadProfile より先に確定させる）
       await loadProfile(cred.user.uid);
     },
     [loadProfile]
@@ -335,15 +115,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const logOut = useCallback(async () => {
-    const uid = auth.currentUser?.uid;
-    if (uid) {
-      await clearSessionOnServer(uid);
-      clearSessionStorage(uid);
-      currentSessionIdRef.current = null;
-    }
     await signOut(auth);
     setProfile(null);
-  }, [clearSessionOnServer]);
+  }, []);
 
   const updatePlayerName = useCallback(async (name: string) => {
     if (!user) return;
@@ -352,44 +126,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile((prev) => prev ? { ...prev, playerName: name, updatedAt: now } : prev);
   }, [user]);
 
-  const topUpChips = useCallback(async (amount: number) => {
-    if (!user || !profile) return;
-    const now = Date.now();
-    const updated = {
-      chipBalance: profile.chipBalance + amount,
-      totalTopUp: profile.totalTopUp + amount,
-      lifetimeProfit: profile.lifetimeProfit - amount,
-      updatedAt: now,
-    };
-    await updateDoc(doc(firestore, 'users', user.uid), updated);
-    setProfile((prev) => prev ? { ...prev, ...updated } : prev);
-  }, [user, profile]);
-
-  const saveGameResult = useCallback(async (roomId: string, buyin: number, finalStack: number) => {
-    if (!user || !profile) return;
-    const gameDelta = finalStack - buyin;
-    const now = Date.now();
-    const result: GameResult = { roomId, buyin, finalStack, gameDelta, savedAt: now };
-    await addDoc(collection(firestore, 'users', user.uid, 'gameResults'), result);
-    const updated = {
-      chipBalance: profile.chipBalance + gameDelta,
-      lifetimeProfit: profile.lifetimeProfit + gameDelta,
-      updatedAt: now,
-    };
-    await updateDoc(doc(firestore, 'users', user.uid), updated);
-    setProfile((prev) => prev ? { ...prev, ...updated } : prev);
-  }, [user, profile]);
-
   const addFriend = useCallback(async (friendUid: string) => {
     if (!user || !profile) return;
     if (profile.friendIds.includes(friendUid)) return;
     const now = Date.now();
     const newIds = [...profile.friendIds, friendUid];
 
-    // 自分のリストに相手を追加
     await updateDoc(doc(firestore, 'users', user.uid), { friendIds: newIds, updatedAt: now });
 
-    // 相手のリストにも自分を追加（firestore.rules で許可）
     try {
       const friendSnap = await getDoc(doc(firestore, 'users', friendUid));
       if (friendSnap.exists()) {
@@ -413,10 +157,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const now = Date.now();
     const newIds = profile.friendIds.filter((id) => id !== friendUid);
 
-    // 自分のリストから相手を削除
     await updateDoc(doc(firestore, 'users', user.uid), { friendIds: newIds, updatedAt: now });
 
-    // 相手のリストからも自分を削除（firestore.rules で許可）
     try {
       const friendSnap = await getDoc(doc(firestore, 'users', friendUid));
       if (friendSnap.exists()) {
@@ -465,6 +207,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return results;
   }, [profile]);
 
+  const getGameResults = useCallback(async () => {
+    if (!user) return [];
+    const snap = await getDocs(collection(firestore, 'users', user.uid, 'gameResults'));
+    return snap.docs
+      .map((d) => d.data() as GameResult)
+      .sort((a, b) => a.savedAt - b.savedAt);
+  }, [user]);
+
+  // ゲーム結果を保存し lifetimeProfit を更新する（GameContext から呼ばれる）
+  const saveGameResult = useCallback(async (totalBuyin: number, finalStack: number, roomId: string) => {
+    if (!user) return;
+    const gameDelta = finalStack - totalBuyin;
+    const now = Date.now();
+    const result: GameResult = { roomId, totalBuyin, finalStack, gameDelta, savedAt: now };
+    await addDoc(collection(firestore, 'users', user.uid, 'gameResults'), result);
+    const snap = await getDoc(doc(firestore, 'users', user.uid));
+    if (snap.exists()) {
+      const data = snap.data() as { lifetimeProfit?: number };
+      await updateDoc(doc(firestore, 'users', user.uid), {
+        lifetimeProfit: (data.lifetimeProfit ?? 0) + gameDelta,
+        activeRoomId: null,
+        updatedAt: now,
+      });
+      setProfile((prev) => prev ? { ...prev, lifetimeProfit: (prev.lifetimeProfit ?? 0) + gameDelta, activeRoomId: null, updatedAt: now } : prev);
+    }
+  }, [user]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -476,12 +245,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logIn,
         logOut,
         updatePlayerName,
-        topUpChips,
         saveGameResult,
         addFriend,
         removeFriend,
         setActiveRoom,
         getFriendProfiles,
+        getGameResults,
         refreshProfile,
       }}
     >

@@ -13,15 +13,8 @@ export default function CreateRoomTab() {
   const [bbInput, setBbInput] = useState(20);
   const [loading, setLoading] = useState(false);
 
-  const chipBalance = profile?.chipBalance ?? 0;
-  const canCreate = chipBalance >= buyinInput;
-
   async function handleCreate() {
     if (!profile) return;
-    if (!canCreate) {
-      alert(`所持チップが不足しています（所持: $${chipBalance}、バイイン: $${buyinInput}）`);
-      return;
-    }
     setLoading(true);
     try {
       await createRoom(buyinInput, sbInput, bbInput);
@@ -54,24 +47,6 @@ export default function CreateRoomTab() {
         <span style={{ fontWeight: '600', fontSize: '16px' }}>{profile?.playerName ?? '-'}</span>
       </div>
 
-      <div
-        style={{
-          background: 'rgba(255,255,255,0.05)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: '12px',
-          padding: '16px',
-          marginBottom: '24px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>所持チップ</span>
-        <span style={{ fontWeight: '700', fontSize: '18px', color: '#4ade80' }}>
-          ${chipBalance.toLocaleString()}
-        </span>
-      </div>
-
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '28px' }}>
         <div>
           <label style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', marginBottom: '6px', display: 'block' }}>
@@ -87,18 +62,13 @@ export default function CreateRoomTab() {
               width: '100%',
               padding: '12px 16px',
               background: 'rgba(255,255,255,0.08)',
-              border: `1px solid ${canCreate ? 'rgba(255,255,255,0.15)' : 'rgba(239,68,68,0.5)'}`,
+              border: '1px solid rgba(255,255,255,0.15)',
               borderRadius: '10px',
               color: '#fff',
               fontSize: '15px',
               boxSizing: 'border-box',
             }}
           />
-          {!canCreate && (
-            <p style={{ fontSize: '12px', color: '#f87171', marginTop: '4px' }}>
-              所持チップが不足しています
-            </p>
-          )}
         </div>
 
         <div>
@@ -150,20 +120,17 @@ export default function CreateRoomTab() {
 
       <button
         onClick={handleCreate}
-        disabled={loading || !canCreate}
+        disabled={loading}
         style={{
           width: '100%',
           padding: '14px',
-          background:
-            loading || !canCreate
-              ? '#555'
-              : 'linear-gradient(145deg, #22c55e, #16a34a)',
+          background: loading ? '#555' : 'linear-gradient(145deg, #22c55e, #16a34a)',
           borderRadius: '12px',
           fontWeight: '700',
           fontSize: '16px',
           color: '#fff',
           border: 'none',
-          cursor: loading || !canCreate ? 'not-allowed' : 'pointer',
+          cursor: loading ? 'not-allowed' : 'pointer',
         }}
       >
         {loading ? '作成中...' : 'ルーム作成して参加'}

@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
-import type { UserProfile } from '@/types';
+import ProfitGraphModal from '@/components/ProfitGraphModal';
+import type { GameResult, UserProfile } from '@/types';
 
 interface FriendInfo {
   uid: string;
@@ -13,14 +14,11 @@ interface FriendInfo {
 }
 
 export default function ProfileTab() {
-  const { user, profile, profileLoading, logOut, updatePlayerName, topUpChips, addFriend, removeFriend } = useAuth();
+  const { user, profile, profileLoading, logOut, updatePlayerName, addFriend, removeFriend, getGameResults } = useAuth();
 
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [nameSaving, setNameSaving] = useState(false);
-
-  const [topUpAmount, setTopUpAmount] = useState(1000);
-  const [topUpLoading, setTopUpLoading] = useState(false);
 
   const [friendUidInput, setFriendUidInput] = useState('');
   const [addingFriend, setAddingFriend] = useState(false);
@@ -28,6 +26,10 @@ export default function ProfileTab() {
   const [friendsLoading, setFriendsLoading] = useState(false);
 
   const [uidCopied, setUidCopied] = useState(false);
+  const [showProfitGraph, setShowProfitGraph] = useState(false);
+  const [profitGraphLoading, setProfitGraphLoading] = useState(false);
+  const [profitGraphError, setProfitGraphError] = useState<string | null>(null);
+  const [gameResults, setGameResults] = useState<GameResult[]>([]);
 
   useEffect(() => {
     if (profile?.playerName != null && !editingName) {
@@ -64,6 +66,38 @@ export default function ProfileTab() {
     return () => { cancelled = true; };
   }, [profile?.friendIds.join(',')]);
 
+  useEffect(() => {
+    if (!showProfitGraph) return;
+
+    let cancelled = false;
+
+    async function loadGameResults() {
+      setProfitGraphLoading(true);
+      setProfitGraphError(null);
+
+      try {
+        const results = await getGameResults();
+        if (!cancelled) {
+          setGameResults(results);
+        }
+      } catch {
+        if (!cancelled) {
+          setProfitGraphError('収支データの取得に失敗しました');
+        }
+      } finally {
+        if (!cancelled) {
+          setProfitGraphLoading(false);
+        }
+      }
+    }
+
+    loadGameResults();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showProfitGraph, getGameResults]);
+
   async function handleSaveName() {
     if (!nameInput.trim()) return;
     setNameSaving(true);
@@ -72,17 +106,6 @@ export default function ProfileTab() {
       setEditingName(false);
     } finally {
       setNameSaving(false);
-    }
-  }
-
-  async function handleTopUp() {
-    if (topUpAmount <= 0) return;
-    setTopUpLoading(true);
-    try {
-      await topUpChips(topUpAmount);
-      alert(`$${topUpAmount} を追加しました（生涯収支から差し引かれます）`);
-    } finally {
-      setTopUpLoading(false);
     }
   }
 
@@ -283,96 +306,35 @@ export default function ProfileTab() {
         </div>
       </div>
 
-      {/* 持ちチップ・生涯収支 */}
-      <div
+      {/* 生涯収支 */}
+      <button
+        type="button"
+        onClick={() => setShowProfitGraph(true)}
         style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '12px',
-          marginBottom: '12px',
-        }}
-      >
-        <div
-          style={{
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: '12px',
-            padding: '16px',
-          }}
-        >
-          <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginBottom: '6px' }}>持ちチップ</div>
-          <div style={{ fontSize: '20px', fontWeight: '700', color: '#4ade80' }}>
-            ${(profile?.chipBalance ?? 0).toLocaleString()}
-          </div>
-        </div>
-        <div
-          style={{
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: '12px',
-            padding: '16px',
-          }}
-        >
-          <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginBottom: '6px' }}>生涯収支</div>
-          <div style={{ fontSize: '20px', fontWeight: '700', color: profitColor }}>
-            {(profile?.lifetimeProfit ?? 0) >= 0 ? '+' : ''}
-            ${(profile?.lifetimeProfit ?? 0).toLocaleString()}
-          </div>
-        </div>
-      </div>
-
-      {/* チップ追加 */}
-      <div
-        style={{
+          width: '100%',
           background: 'rgba(255,255,255,0.05)',
           border: '1px solid rgba(255,255,255,0.1)',
           borderRadius: '12px',
           padding: '16px',
           marginBottom: '24px',
+          textAlign: 'left',
+          cursor: 'pointer',
         }}
       >
-        <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', marginBottom: '10px' }}>
-          チップ追加（生涯収支から差し引かれます）
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+          <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginBottom: '6px' }}>生涯収支</div>
+          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', whiteSpace: 'nowrap' }}>
+            タップでグラフ
+          </div>
         </div>
-        <div className="profile-tab-row">
-          <input
-            type="number"
-            value={topUpAmount}
-            min={100}
-            step={100}
-            onChange={(e) => setTopUpAmount(Number(e.target.value))}
-            className="profile-tab-input"
-            style={{
-              flex: 1,
-              minWidth: 0,
-              padding: '10px 14px',
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              borderRadius: '8px',
-              color: '#fff',
-              fontSize: '16px',
-            }}
-          />
-          <button
-            onClick={handleTopUp}
-            disabled={topUpLoading}
-            className="profile-tab-btn"
-            style={{
-              padding: '8px 14px',
-              background: topUpLoading ? '#555' : 'linear-gradient(145deg, #f59e0b, #d97706)',
-              borderRadius: '8px',
-              fontWeight: '600',
-              fontSize: '13px',
-              color: '#fff',
-              border: 'none',
-              cursor: topUpLoading ? 'not-allowed' : 'pointer',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {topUpLoading ? '追加中...' : '追加'}
-          </button>
+        <div style={{ fontSize: '28px', fontWeight: '700', color: profitColor }}>
+          {(profile?.lifetimeProfit ?? 0) >= 0 ? '+' : ''}
+          ${(profile?.lifetimeProfit ?? 0).toLocaleString()}
         </div>
-      </div>
+        <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>
+          バイイン合計 − 最終スタックの累計
+        </div>
+      </button>
 
       {/* フレンド一覧 */}
       <div>
@@ -478,6 +440,15 @@ export default function ProfileTab() {
           </div>
         )}
       </div>
+
+      {showProfitGraph && (
+        <ProfitGraphModal
+          results={gameResults}
+          loading={profitGraphLoading}
+          error={profitGraphError}
+          onClose={() => setShowProfitGraph(false)}
+        />
+      )}
     </div>
   );
 }

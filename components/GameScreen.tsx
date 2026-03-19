@@ -25,7 +25,7 @@ function useWindowSize() {
 }
 
 export default function GameScreen() {
-  const { pokerState, myPlayerId, isHost, currentRoomId, sb, bb, updateBlinds, leaveGame, requestReentry, buyin } =
+  const { pokerState, myPlayerId, isHost, sb, bb, updateBlinds, leaveGame, requestReentry, buyin } =
     useGame();
   const [showRanking, setShowRanking] = useState(false);
   const [showHostMenu, setShowHostMenu] = useState(false);
@@ -50,8 +50,8 @@ export default function GameScreen() {
     }
   }
 
-  // 自分がゲームに参加していない場合（bust 後 or リエントリー待ち）
-  if (!myPlayer && !isHost) {
+  // 自分がゲームに参加していない場合（bust 後 or リエントリー待ち / 途中参加待ち）
+  if (!myPlayer) {
     return (
       <div id="game-screen" className="playing">
         <div
@@ -66,7 +66,7 @@ export default function GameScreen() {
           }}
         >
           <div style={{ fontSize: '16px', color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>
-            次のハンドからリエントリーできます
+            次のハンドから参加できます
           </div>
           <button
             onClick={requestReentry}
@@ -81,10 +81,10 @@ export default function GameScreen() {
               cursor: 'pointer',
             }}
           >
-            リエントリー ({buyin} チップ追加)
+            参加リクエスト ({buyin} チップ追加)
           </button>
           <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
-            ホストが承認すると次のハンドから参加できます
+            次のハンド開始時に自動で追加されます
           </div>
         </div>
       </div>
@@ -114,8 +114,6 @@ export default function GameScreen() {
 
   return (
     <div id="game-screen" className="playing">
-      <div id="top-bar" className="game-started" />
-
       <div id="game-area">
         <div className="game-container">
           <div className="table-area">
@@ -218,21 +216,6 @@ export default function GameScreen() {
         </button>
       )}
 
-      {/* ルームID */}
-      {currentRoomId && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '14px',
-            left: isHost ? '64px' : '12px',
-            fontSize: '12px',
-            color: 'rgba(255,255,255,0.6)',
-            zIndex: 100,
-          }}
-        >
-          Room: {currentRoomId}
-        </div>
-      )}
 
       {/* ホストメニューモーダル（ゲーム中） */}
       {showHostMenu && (

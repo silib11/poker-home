@@ -54,9 +54,7 @@ export interface UserProfile {
   uid: string;
   email: string;
   playerName: string;
-  chipBalance: number;
   lifetimeProfit: number;
-  totalTopUp: number;
   friendIds: string[];
   activeRoomId: string | null;
   createdAt: number;
@@ -65,7 +63,7 @@ export interface UserProfile {
 
 export interface GameResult {
   roomId: string;
-  buyin: number;
+  totalBuyin: number;
   finalStack: number;
   gameDelta: number;
   savedAt: number;
@@ -79,21 +77,3 @@ export interface RoomMeta {
   hostName: string;
   createdAt: number;
 }
-
-/** RTDB userSessions/{uid} の形状。単一ログイン拒否用。 */
-export interface UserSession {
-  sessionId: string;
-  deviceId: string;
-  lastSeen: number;
-  activeRoomId: string | null;
-  status: 'online';
-}
-
-/** セッション有効期限（ms）。この時間 heartbeat がなければ別端末からログイン可能。 */
-export const SESSION_TTL_MS = 45_000;
-
-/** heartbeat 更新間隔（ms）。TTL より十分短くする。 */
-export const SESSION_HEARTBEAT_INTERVAL_MS = 12_000;
-
-/** 多重ログイン拒否時に throw する識別用メッセージ。 */
-export const ERROR_ALREADY_LOGGED_IN = 'session-already-active';

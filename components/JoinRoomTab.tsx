@@ -15,15 +15,13 @@ interface FriendRoom {
 }
 
 export default function JoinRoomTab() {
-  const { profile, getFriendProfiles } = useAuth();
+  const { getFriendProfiles } = useAuth();
   const { joinRoom } = useGame();
 
   const [roomIdInput, setRoomIdInput] = useState('');
   const [loading, setLoading] = useState<string | null>(null);
   const [friendRooms, setFriendRooms] = useState<FriendRoom[]>([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
-
-  const chipBalance = profile?.chipBalance ?? 0;
 
   useEffect(() => {
     let cancelled = false;
@@ -58,20 +56,6 @@ export default function JoinRoomTab() {
       return;
     }
     const roomId = roomIdInput.trim().toUpperCase();
-
-    let meta: RoomMeta | null = null;
-    try {
-      const snap = await get(ref(db, `roomMeta/${roomId}`));
-      if (snap.exists()) meta = snap.val() as RoomMeta;
-    } catch {
-      // メタなしでも参加試みる
-    }
-
-    if (meta && chipBalance < meta.buyin) {
-      alert(`所持チップが不足しています（所持: $${chipBalance}、バイイン: $${meta.buyin}）`);
-      return;
-    }
-
     setLoading('input');
     try {
       await joinRoom(roomId);
@@ -83,10 +67,6 @@ export default function JoinRoomTab() {
   }
 
   async function handleJoinFriendRoom(room: FriendRoom) {
-    if (room.meta && chipBalance < room.meta.buyin) {
-      alert(`所持チップが不足しています（所持: $${chipBalance}、バイイン: $${room.meta.buyin}）`);
-      return;
-    }
     setLoading(room.activeRoomId);
     try {
       await joinRoom(room.activeRoomId);
@@ -102,24 +82,6 @@ export default function JoinRoomTab() {
       <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '24px' }}>
         ルーム参加
       </h2>
-
-      <div
-        style={{
-          background: 'rgba(255,255,255,0.05)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: '12px',
-          padding: '16px',
-          marginBottom: '24px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>所持チップ</span>
-        <span style={{ fontWeight: '700', fontSize: '18px', color: '#4ade80' }}>
-          ${chipBalance.toLocaleString()}
-        </span>
-      </div>
 
       {/* フレンドの部屋 */}
       <div style={{ marginBottom: '28px' }}>
@@ -146,58 +108,50 @@ export default function JoinRoomTab() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {friendRooms.map((room) => {
-              const canJoin = !room.meta || chipBalance >= room.meta.buyin;
-              return (
-                <div
-                  key={room.activeRoomId}
+            {friendRooms.map((room) => (
+              <div
+                key={room.activeRoomId}
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '12px',
+                  padding: '14px 16px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '12px',
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: '600', fontSize: '15px', marginBottom: '2px' }}>
+                    {room.playerName}
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
+                    {room.meta
+                      ? `バイイン $${room.meta.buyin} / SB $${room.meta.sb} / BB $${room.meta.bb}`
+                      : `ID: ${room.activeRoomId}`}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleJoinFriendRoom(room)}
+                  disabled={loading === room.activeRoomId}
                   style={{
-                    background: 'rgba(255,255,255,0.05)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '12px',
-                    padding: '14px 16px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: '12px',
+                    padding: '8px 16px',
+                    background: loading === room.activeRoomId ? '#555' : 'linear-gradient(145deg, #3b82f6, #2563eb)',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    fontSize: '13px',
+                    color: '#fff',
+                    border: 'none',
+                    cursor: loading === room.activeRoomId ? 'not-allowed' : 'pointer',
+                    whiteSpace: 'nowrap',
+                    alignSelf: 'flex-end',
                   }}
                 >
-                  <div>
-                    <div style={{ fontWeight: '600', fontSize: '15px', marginBottom: '2px' }}>
-                      {room.playerName}
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
-                      {room.meta
-                        ? `バイイン $${room.meta.buyin} / SB $${room.meta.sb} / BB $${room.meta.bb}`
-                        : `ID: ${room.activeRoomId}`}
-                    </div>
-                    {!canJoin && (
-                      <div style={{ fontSize: '11px', color: '#f87171', marginTop: '2px' }}>
-                        チップ不足
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => handleJoinFriendRoom(room)}
-                    disabled={loading === room.activeRoomId || !canJoin}
-                    style={{
-                      padding: '8px 16px',
-                      background: !canJoin ? '#555' : 'linear-gradient(145deg, #3b82f6, #2563eb)',
-                      borderRadius: '8px',
-                      fontWeight: '600',
-                      fontSize: '13px',
-                      color: '#fff',
-                      border: 'none',
-                      cursor: !canJoin ? 'not-allowed' : 'pointer',
-                      whiteSpace: 'nowrap',
-                      alignSelf: 'flex-end',
-                    }}
-                  >
-                    {loading === room.activeRoomId ? '参加中...' : '参加'}
-                  </button>
-                </div>
-              );
-            })}
+                  {loading === room.activeRoomId ? '参加中...' : '参加'}
+                </button>
+              </div>
+            ))}
           </div>
         )}
       </div>

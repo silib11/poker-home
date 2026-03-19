@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { ERROR_ALREADY_LOGGED_IN } from '@/types';
 
 export default function AuthScreen() {
   const { signUp, logIn } = useAuth();
@@ -32,9 +31,7 @@ export default function AuthScreen() {
       }
     } catch (e: unknown) {
       const msg = (e as { message?: string }).message ?? '';
-      if (msg.includes(ERROR_ALREADY_LOGGED_IN)) {
-        setError('すでに別の端末でログイン中です。そちらでログアウトするか、しばらくお待ちください。');
-      } else if (msg.includes('email-already-in-use')) {
+      if (msg.includes('email-already-in-use')) {
         setError('このメールアドレスはすでに使われています');
       } else if (msg.includes('wrong-password') || msg.includes('user-not-found') || msg.includes('invalid-credential')) {
         setError('メールアドレスまたはパスワードが間違っています');
