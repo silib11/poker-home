@@ -483,10 +483,10 @@ input[type="range"]::-moz-range-thumb {
 
 .card-value { font-size: 18px; line-height: 1; }
 .card-suit { font-size: 22px; line-height: 1; }
-.card.red { color: #dc2626; }
-.card.black { color: #1e293b; }
-.card.blue { color: #2563eb; }
-.card.green { color: #16a34a; }
+.card.red { color: #cc0000; }
+.card.black { color: #000; }
+.card.blue { color: #1040c8; }
+.card.green { color: #047a2e; }
 
 /* Players Container */
 .players-container {

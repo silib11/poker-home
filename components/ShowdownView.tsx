@@ -53,10 +53,19 @@ export default function ShowdownView({ state, showHands, showResult }: Props) {
   const isReady = state.nextHandReady?.includes(myPlayerId ?? '') ?? false;
   const showSidePots = showResult && shouldDisplaySidePots(state);
 
-  const winnerIds = new Set(
-    (state.potResults ?? []).map((r) => r.player.id)
+  const mainWinnerIds = new Set(
+    (state.potResults ?? [])
+      .filter((r) => r.potType === 'main')
+      .map((r) => r.player.id)
   );
-  if (state.winner) winnerIds.add(state.winner.id);
+  if (state.winner) mainWinnerIds.add(state.winner.id);
+
+  const winnerIds = showSidePots
+    ? mainWinnerIds
+    : new Set([
+        ...(state.potResults ?? []).map((r) => r.player.id),
+        ...(state.winner ? [state.winner.id] : []),
+      ]);
 
   return (
     <div style={{ textAlign: 'center', margin: '20px 0', paddingBottom: '40px' }}>
@@ -126,18 +135,18 @@ export default function ShowdownView({ state, showHands, showResult }: Props) {
                       <div
                         key={potType}
                         style={{
-                          background: '#2a4d2a',
+                          background: '#2a2a2a',
                           padding: '12px',
                           margin: '10px 0',
                           borderRadius: '8px',
-                          border: '2px solid #88aa88',
+                          border: '1px solid #555',
                         }}
                       >
                         <div
                           style={{
                             fontSize: '14px',
                             fontWeight: 'bold',
-                            color: '#88aa88',
+                            color: '#999',
                             marginBottom: '6px',
                           }}
                         >
@@ -145,17 +154,17 @@ export default function ShowdownView({ state, showHands, showResult }: Props) {
                         </div>
                         {groups[potType].map((r, i) => (
                           <div key={i} style={{ margin: '4px 0' }}>
-                            <span style={{ fontSize: '16px' }}>
+                            <span style={{ fontSize: '16px', color: '#ccc' }}>
                               {r.player.name}{' '}
                             </span>
-                            <span style={{ fontSize: '13px', color: '#ccc' }}>
+                            <span style={{ fontSize: '13px', color: '#888' }}>
                               {r.handName}
                             </span>
                             <div style={{ fontSize: '14px', marginTop: '2px' }}>
                               獲得:{' '}
                               <span
                                 style={{
-                                  color: '#00ff00',
+                                  color: '#7dd87d',
                                   fontWeight: 'bold',
                                 }}
                               >
