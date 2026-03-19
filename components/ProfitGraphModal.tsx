@@ -20,6 +20,7 @@ interface DailyPoint {
 interface ChartPoint extends DailyPoint {
   x: number;
   y: number;
+  color: string;
 }
 
 interface SegmentPart {
@@ -30,8 +31,10 @@ interface SegmentPart {
   color: string;
 }
 
-const POSITIVE_COLOR = '#4ade80';
-const NEGATIVE_COLOR = '#f87171';
+const POSITIVE_BRIGHT_COLOR = '#4ade80';
+const POSITIVE_DARK_COLOR = '#16a34a';
+const NEGATIVE_BRIGHT_COLOR = '#f87171';
+const NEGATIVE_DARK_COLOR = '#dc2626';
 const NEUTRAL_COLOR = 'rgba(255,255,255,0.45)';
 
 function formatCurrency(value: number) {
@@ -39,14 +42,29 @@ function formatCurrency(value: number) {
   return `${rounded >= 0 ? '+' : '-'}$${Math.abs(rounded).toLocaleString()}`;
 }
 
-function getValueColor(value: number) {
-  if (value > 0) return POSITIVE_COLOR;
-  if (value < 0) return NEGATIVE_COLOR;
+function getTrendColor(value: number, previousValue?: number) {
+  if (value === 0) return NEUTRAL_COLOR;
+  if (previousValue == null) {
+    return value > 0 ? POSITIVE_BRIGHT_COLOR : NEGATIVE_BRIGHT_COLOR;
+  }
+
+  const increased = value >= previousValue;
+
+  if (value > 0) {
+    return increased ? POSITIVE_BRIGHT_COLOR : POSITIVE_DARK_COLOR;
+  }
+
+  return increased ? NEGATIVE_BRIGHT_COLOR : NEGATIVE_DARK_COLOR;
+}
+
+function getExtremeValueColor(value: number) {
+  if (value > 0) return POSITIVE_BRIGHT_COLOR;
+  if (value < 0) return NEGATIVE_BRIGHT_COLOR;
   return NEUTRAL_COLOR;
 }
 
 function buildDailyPoints(results: GameResult[]): DailyPoint[] {
-  const dailyMap = new Map<string, DailyPoint>();
+  const dailyMap = new Map<string, { key: string; label: string; delta: number; timestamp: number }>();
 
   for (const result of results) {
     const date = new Date(result.savedAt);
@@ -58,18 +76,30 @@ function buildDailyPoints(results: GameResult[]): DailyPoint[] {
     const current = dailyMap.get(key);
 
     if (current) {
-      current.value += result.gameDelta;
+      current.delta += result.gameDelta;
     } else {
       dailyMap.set(key, {
         key,
         label: `${month}/${day}`,
-        value: result.gameDelta,
+        delta: result.gameDelta,
         timestamp,
       });
     }
   }
 
-  return [...dailyMap.values()].sort((a, b) => a.timestamp - b.timestamp);
+  let runningTotal = 0;
+
+  return [...dailyMap.values()]
+    .sort((a, b) => a.timestamp - b.timestamp)
+    .map((point) => {
+      runningTotal += point.delta;
+      return {
+        key: point.key,
+        label: point.label,
+        value: runningTotal,
+        timestamp: point.timestamp,
+      };
+    });
 }
 
 function getZeroSafeRange(minValue: number, maxValue: number) {
@@ -87,19 +117,7 @@ function getSegmentParts(start: ChartPoint, end: ChartPoint, zeroY: number): Seg
   }
 
   if ((startValue >= 0 && endValue >= 0) || (startValue <= 0 && endValue <= 0)) {
-    const color = startValue === 0 && endValue < 0
-      ? NEGATIVE_COLOR
-      : startValue === 0 && endValue > 0
-      ? POSITIVE_COLOR
-      : endValue === 0 && startValue < 0
-      ? NEGATIVE_COLOR
-      : endValue === 0 && startValue > 0
-      ? POSITIVE_COLOR
-      : startValue >= 0
-      ? POSITIVE_COLOR
-      : NEGATIVE_COLOR;
-
-    return [{ x1: start.x, y1: start.y, x2: end.x, y2: end.y, color }];
+    return [{ x1: start.x, y1: start.y, x2: end.x, y2: end.y, color: end.color }];
   }
 
   const ratio = Math.abs(startValue) / (Math.abs(startValue) + Math.abs(endValue));
@@ -111,14 +129,14 @@ function getSegmentParts(start: ChartPoint, end: ChartPoint, zeroY: number): Seg
       y1: start.y,
       x2: crossX,
       y2: zeroY,
-      color: startValue > 0 ? POSITIVE_COLOR : NEGATIVE_COLOR,
+      color: start.color,
     },
     {
       x1: crossX,
       y1: zeroY,
       x2: end.x,
       y2: end.y,
-      color: endValue > 0 ? POSITIVE_COLOR : NEGATIVE_COLOR,
+      color: end.color,
     },
   ];
 }
@@ -152,11 +170,13 @@ export default function ProfitGraphModal({ results, loading, error, onClose }: P
       const x = points.length === 1
         ? paddingLeft + graphWidth / 2
         : paddingLeft + (graphWidth * index) / (points.length - 1);
+      const previousValue = index > 0 ? points[index - 1].value : undefined;
 
       return {
         ...point,
         x,
         y: toY(point.value),
+        color: getTrendColor(point.value, previousValue),
       };
     });
 
@@ -195,7 +215,7 @@ export default function ProfitGraphModal({ results, loading, error, onClose }: P
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header">
-          <h3>日別収支グラフ</h3>
+          <h3>生涯収支グラフ</h3>
           <button className="close-btn" onClick={onClose}>
             ×
           </button>
@@ -203,7 +223,7 @@ export default function ProfitGraphModal({ results, loading, error, onClose }: P
 
         <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.55)' }}>
-            プレイした日だけを横軸に表示しています
+            プレイした日だけを横軸に表示した、生涯収支の推移です
           </div>
 
           {loading ? (
@@ -253,8 +273,8 @@ export default function ProfitGraphModal({ results, loading, error, onClose }: P
                     border: '1px solid rgba(255,255,255,0.08)',
                   }}
                 >
-                  <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>最高日次収支</div>
-                  <div style={{ color: getValueColor(Math.max(...points.map((point) => point.value))), fontWeight: 700 }}>
+                  <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>最高生涯収支</div>
+                  <div style={{ color: getExtremeValueColor(Math.max(...points.map((point) => point.value))), fontWeight: 700 }}>
                     {formatCurrency(Math.max(...points.map((point) => point.value)))}
                   </div>
                 </div>
@@ -266,8 +286,8 @@ export default function ProfitGraphModal({ results, loading, error, onClose }: P
                     border: '1px solid rgba(255,255,255,0.08)',
                   }}
                 >
-                  <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>最低日次収支</div>
-                  <div style={{ color: getValueColor(Math.min(...points.map((point) => point.value))), fontWeight: 700 }}>
+                  <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>最低生涯収支</div>
+                  <div style={{ color: getExtremeValueColor(Math.min(...points.map((point) => point.value))), fontWeight: 700 }}>
                     {formatCurrency(Math.min(...points.map((point) => point.value)))}
                   </div>
                 </div>
@@ -298,7 +318,7 @@ export default function ProfitGraphModal({ results, loading, error, onClose }: P
                   height={chart.svgHeight}
                   viewBox={`0 0 ${chart.svgWidth} ${chart.svgHeight}`}
                   role="img"
-                  aria-label="日別収支グラフ"
+                  aria-label="生涯収支グラフ"
                 >
                   <line
                     x1={16}
@@ -355,7 +375,7 @@ export default function ProfitGraphModal({ results, loading, error, onClose }: P
                         cx={point.x}
                         cy={point.y}
                         r="4.5"
-                        fill={getValueColor(point.value)}
+                        fill={point.color}
                         stroke="#111827"
                         strokeWidth="2"
                       />
@@ -371,7 +391,7 @@ export default function ProfitGraphModal({ results, loading, error, onClose }: P
                       <text
                         x={point.x}
                         y={point.value >= 0 ? point.y - 10 : point.y + 18}
-                        fill={getValueColor(point.value)}
+                        fill={point.color}
                         fontSize="11"
                         fontWeight="700"
                         textAnchor="middle"
