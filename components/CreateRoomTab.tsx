@@ -17,6 +17,18 @@ function roundToNice(n: number): number {
   return nice * magnitude;
 }
 
+/** current より大きい最小のキリの良い数を返す */
+function nextNiceAbove(current: number): number {
+  const bases = [1, 2, 5];
+  const magnitude = Math.pow(10, Math.floor(Math.log10(current)));
+  for (let m = magnitude; m <= current * 100; m *= 10) {
+    for (const b of bases) {
+      if (b * m > current) return b * m;
+    }
+  }
+  return current * 2;
+}
+
 function generateBlindLevels(
   initialBb: number,
   count: number,
@@ -25,15 +37,15 @@ function generateBlindLevels(
 ): BlindLevel[] {
   const levels: BlindLevel[] = [];
   let bb = initialBb;
-  let sb = Math.max(1, Math.round(bb / 2));
+  let sb = Math.max(1, roundToNice(Math.round(bb / 2)));
 
   for (let i = 0; i < count; i++) {
     const level = i + 1;
     const ante = anteStartLevel > 0 && level >= anteStartLevel ? roundToNice(Math.round(bb * 0.1)) : 0;
     levels.push({ level, sb, bb, ante, durationMinutes });
 
-    const nextBb = roundToNice(Math.round(bb * 1.5));
-    bb = nextBb;
+    const candidate = roundToNice(Math.round(bb * 1.5));
+    bb = candidate > bb ? candidate : nextNiceAbove(bb);
     sb = roundToNice(Math.round(bb / 2));
   }
   return levels;
