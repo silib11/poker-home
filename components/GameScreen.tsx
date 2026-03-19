@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useGame } from '@/context/GameContext';
 import { getOpponentPositions } from '@/lib/playerPositions';
 import CommunityCards from './CommunityCards';
@@ -8,6 +8,7 @@ import PlayerSeat from './PlayerSeat';
 import ActionPanel from './ActionPanel';
 import RankingModal from './RankingModal';
 import WinnerView from './WinnerView';
+import ShowdownView from './ShowdownView';
 
 function useWindowSize() {
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -24,16 +25,184 @@ function useWindowSize() {
   return size;
 }
 
+// フェーズの順序とコミュニティカード枚数マップ
+const PHASE_ORDER = ['PREFLOP', 'FLOP', 'TURN', 'RIVER', 'SHOWDOWN'];
+const COMM_COUNT: Record<string, number> = {
+  FLOP: 3,
+  TURN: 4,
+  RIVER: 5,
+  SHOWDOWN: 5,
+};
+
+// バナーに表示するフェーズ名
+const PHASE_LABEL: Record<string, string> = {
+  FLOP: 'FLOP',
+  TURN: 'TURN',
+  RIVER: 'RIVER',
+  SHOWDOWN: 'SHOWDOWN',
+};
+
 export default function GameScreen() {
-  const { pokerState, myPlayerId, isHost, sb, bb, updateBlinds, leaveGame, requestReentry, buyin } =
-    useGame();
+  const {
+    pokerState,
+    myPlayerId,
+    isHost,
+    sb,
+    bb,
+    updateBlinds,
+    leaveGame,
+    requestReentry,
+    buyin,
+  } = useGame();
   const [showRanking, setShowRanking] = useState(false);
   const [showHostMenu, setShowHostMenu] = useState(false);
-  const [showPlayerMenu, setShowPlayerMenu] = useState(false);
   const [sbInput, setSbInput] = useState(sb);
   const [bbInput, setBbInput] = useState(bb);
   const [leaving, setLeaving] = useState(false);
   const { width, height } = useWindowSize();
+
+  // UI用フェーズ演出ステート
+  const [visibleCommunityCount, setVisibleCommunityCount] = useState(0);
+  const [phaseBanner, setPhaseBanner] = useState<string | null>(null);
+  const [showShowdownHands, setShowShowdownHands] = useState(false);
+  const [showShowdownResult, setShowShowdownResult] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  const animTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const prevPhaseRef = useRef<string>('PREFLOP');
+  // 接続直後の初回ステート受信フラグ（アニメーションをスキップする）
+  const isInitialRef = useRef(true);
+
+  // フェーズ変化検知 → アニメーションキューを組み立てて実行
+  useEffect(() => {
+    if (!pokerState) return;
+    const newPhase = pokerState.phase;
+
+    // 接続直後の初回ステート: アニメーションなしで即時表示
+    if (isInitialRef.current) {
+      isInitialRef.current = false;
+      setVisibleCommunityCount(pokerState.community.length);
+      prevPhaseRef.current = newPhase;
+      if (newPhase === 'SHOWDOWN') {
+        setShowShowdownHands(true);
+        setShowShowdownResult(true);
+      }
+      setIsAnimating(false);
+      return;
+    }
+
+    // 新しいハンド開始（PREFLOP + community なし）→ ビジュアルリセット
+    if (newPhase === 'PREFLOP' && pokerState.community.length === 0) {
+      animTimersRef.current.forEach(clearTimeout);
+      animTimersRef.current = [];
+      setVisibleCommunityCount(0);
+      setPhaseBanner(null);
+      setShowShowdownHands(false);
+      setShowShowdownResult(false);
+      setIsAnimating(false);
+      prevPhaseRef.current = 'PREFLOP';
+      return;
+    }
+
+    const prevPhase = prevPhaseRef.current;
+    if (newPhase === prevPhase) return;
+
+    prevPhaseRef.current = newPhase;
+
+    // WINNER フェーズ（フォールド決着）: アニメーション不要、即時表示
+    if (newPhase === 'WINNER') {
+      animTimersRef.current.forEach(clearTimeout);
+      animTimersRef.current = [];
+      setIsAnimating(false);
+      return;
+    }
+
+    // アニメーションキューを組み立てる
+    const fromIdx = PHASE_ORDER.indexOf(prevPhase);
+    const toIdx = PHASE_ORDER.indexOf(newPhase);
+    if (fromIdx === -1 || toIdx === -1 || toIdx <= fromIdx) return;
+
+    // 前のフェーズから新しいフェーズまでの中間フェーズをすべて列挙
+    // (例: PREFLOP→SHOWDOWN なら [FLOP, TURN, RIVER, SHOWDOWN])
+    const phases = PHASE_ORDER.slice(fromIdx + 1, toIdx + 1);
+
+    animTimersRef.current.forEach(clearTimeout);
+    animTimersRef.current = [];
+    setIsAnimating(true);
+
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    let delay = 0;
+
+    for (let i = 0; i < phases.length; i++) {
+      const phase = phases[i];
+      const isLast = i === phases.length - 1;
+
+      if (phase === 'FLOP' || phase === 'TURN' || phase === 'RIVER') {
+        // バナーを表示（2秒）
+        const d1 = delay;
+        timers.push(setTimeout(() => setPhaseBanner(PHASE_LABEL[phase]), d1));
+        delay += 2000;
+
+        // バナーを消してカードを公開
+        const count = COMM_COUNT[phase];
+        const d2 = delay;
+        if (isLast) {
+          // このフェーズが最後 → アクションを再開
+          timers.push(
+            setTimeout(() => {
+              setPhaseBanner(null);
+              setVisibleCommunityCount(count);
+              setIsAnimating(false);
+            }, d2)
+          );
+        } else {
+          timers.push(
+            setTimeout(() => {
+              setPhaseBanner(null);
+              setVisibleCommunityCount(count);
+            }, d2)
+          );
+          // 次のフェーズバナーまでの短いインターバル
+          delay += 400;
+        }
+      } else if (phase === 'SHOWDOWN') {
+        // SHOWDOWN バナーを表示（2秒）
+        const d3 = delay;
+        timers.push(
+          setTimeout(() => setPhaseBanner(PHASE_LABEL['SHOWDOWN']), d3)
+        );
+        delay += 2000;
+
+        // バナーを消して手札を公開
+        const d4 = delay;
+        timers.push(
+          setTimeout(() => {
+            setPhaseBanner(null);
+            setShowShowdownHands(true);
+          }, d4)
+        );
+        delay += 2000;
+
+        // 結果を表示
+        const d5 = delay;
+        timers.push(
+          setTimeout(() => {
+            setShowShowdownResult(true);
+            setIsAnimating(false);
+          }, d5)
+        );
+      }
+    }
+
+    animTimersRef.current = timers;
+  }, [pokerState?.phase, pokerState?.community?.length]);
+
+  // アンマウント時にタイマーをクリア
+  useEffect(() => {
+    return () => {
+      animTimersRef.current.forEach(clearTimeout);
+    };
+  }, []);
 
   if (!pokerState) return null;
 
@@ -42,7 +211,6 @@ export default function GameScreen() {
   const myPlayer = myIndex >= 0 ? state.players[myIndex] : undefined;
 
   async function handleLeaveGame() {
-    setShowPlayerMenu(false);
     if (!confirm('途中退席しますか？現在のチップ数で精算されます。')) return;
     setLeaving(true);
     try {
@@ -52,7 +220,7 @@ export default function GameScreen() {
     }
   }
 
-  // 自分がゲームに参加していない場合（bust 後 or リエントリー待ち / 途中参加待ち）
+  // バスト後・途中参加待ちのスペクテーター表示
   if (!myPlayer) {
     return (
       <div id="game-screen" className="playing">
@@ -93,8 +261,8 @@ export default function GameScreen() {
     );
   }
 
-  // WINNER / SHOWDOWN フェーズは専用ビューを表示
-  if (state.phase === 'WINNER' || state.phase === 'SHOWDOWN') {
+  // WINNER フェーズ（フォールド決着）: 専用ビュー
+  if (state.phase === 'WINNER') {
     return (
       <div id="game-screen" className="playing">
         <div id="game-area" style={{ marginTop: 0, height: 'auto' }}>
@@ -104,6 +272,22 @@ export default function GameScreen() {
     );
   }
 
+  // SHOWDOWN フェーズ: 手札 or 結果が表示可能になったら ShowdownView へ切り替え
+  if (state.phase === 'SHOWDOWN' && showShowdownHands) {
+    return (
+      <div id="game-screen" className="playing">
+        <div id="game-area" style={{ marginTop: 0, height: 'auto' }}>
+          <ShowdownView
+            state={state}
+            showHands={showShowdownHands}
+            showResult={showShowdownResult}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // 通常のゲーム卓表示（フェーズアニメーション中も含む）
   const positions =
     width > 0
       ? getOpponentPositions(state.players.length, width, height)
@@ -116,6 +300,35 @@ export default function GameScreen() {
 
   return (
     <div id="game-screen" className="playing">
+      {/* フェーズバナー（全画面オーバーレイ） */}
+      {phaseBanner && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0, 0, 0, 0.72)',
+            zIndex: 500,
+            pointerEvents: 'none',
+          }}
+        >
+          <span
+            style={{
+              fontSize: '56px',
+              fontWeight: '900',
+              color: '#ffd700',
+              letterSpacing: '10px',
+              textShadow:
+                '0 0 40px rgba(255, 215, 0, 0.9), 0 0 80px rgba(255, 215, 0, 0.4), 2px 2px 6px rgba(0,0,0,0.8)',
+            }}
+          >
+            {phaseBanner}
+          </span>
+        </div>
+      )}
+
       <div id="game-area">
         <div className="game-container">
           <div className="table-area">
@@ -123,6 +336,7 @@ export default function GameScreen() {
             <CommunityCards
               community={state.community}
               pot={state.pot}
+              visibleCount={visibleCommunityCount}
             />
 
             {/* 相手プレイヤー */}
@@ -149,13 +363,15 @@ export default function GameScreen() {
             </div>
           </div>
 
-          {/* 自分のエリア（スタック + 手札 + アクション） */}
-          <ActionPanel
-            state={state}
-            myPlayer={myPlayer}
-            myIndex={myIndex}
-            onToggleRanking={() => setShowRanking((v) => !v)}
-          />
+          {/* アニメーション中はアクションパネルを非表示 */}
+          {!isAnimating && (
+            <ActionPanel
+              state={state}
+              myPlayer={myPlayer}
+              myIndex={myIndex}
+              onToggleRanking={() => setShowRanking((v) => !v)}
+            />
+          )}
 
           {/* ランキングモーダル */}
           {showRanking && (
@@ -193,71 +409,30 @@ export default function GameScreen() {
         </button>
       )}
 
-      {/* プレイヤーメニューボタン（非ホスト用） */}
+      {/* 途中退席ボタン（非ホスト用） */}
       {!isHost && (
         <button
+          disabled={leaving}
+          onClick={handleLeaveGame}
           style={{
             position: 'fixed',
             top: '10px',
             left: '10px',
-            width: '44px',
-            height: '44px',
+            padding: '8px 12px',
             background: 'rgba(0,0,0,0.7)',
             backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255,255,255,0.2)',
-            borderRadius: '12px',
-            color: '#fff',
-            fontSize: '18px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            border: '1px solid rgba(239,68,68,0.4)',
+            borderRadius: '10px',
+            color: leaving ? 'rgba(255,255,255,0.4)' : '#f87171',
+            fontSize: '12px',
+            fontWeight: '600',
+            cursor: leaving ? 'not-allowed' : 'pointer',
             zIndex: 100,
           }}
-          onClick={() => setShowPlayerMenu(true)}
         >
-          ⚙️
+          {leaving ? '退席中...' : '途中退席'}
         </button>
       )}
-
-      {/* プレイヤーメニューモーダル（非ホスト用） */}
-      {showPlayerMenu && (
-        <div
-          className="modal"
-          style={{ display: 'flex' }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowPlayerMenu(false);
-          }}
-        >
-          <div className="modal-content">
-            <div className="modal-header">
-              <h3>メニュー</h3>
-              <button
-                className="close-btn"
-                onClick={() => setShowPlayerMenu(false)}
-              >
-                ×
-              </button>
-            </div>
-            <div className="modal-body">
-              <button
-                disabled={leaving}
-                onClick={handleLeaveGame}
-                className="modal-btn"
-                style={{
-                  background: 'rgba(239,68,68,0.15)',
-                  border: '1px solid rgba(239,68,68,0.4)',
-                  color: leaving ? 'rgba(255,255,255,0.4)' : '#f87171',
-                  width: '100%',
-                  cursor: leaving ? 'not-allowed' : 'pointer',
-                }}
-              >
-                {leaving ? '退席中...' : '途中退席'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
 
       {/* ホストメニューモーダル（ゲーム中） */}
       {showHostMenu && (

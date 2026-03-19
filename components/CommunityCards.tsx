@@ -23,10 +23,15 @@ function CardEl({ card }: { card: Card }) {
 interface Props {
   community: Card[];
   pot: number;
+  visibleCount?: number;
 }
 
-export default function CommunityCards({ community, pot }: Props) {
-  const hidden = 5 - community.length;
+export default function CommunityCards({ community, pot, visibleCount }: Props) {
+  const displayCount = Math.min(
+    visibleCount !== undefined ? visibleCount : community.length,
+    community.length
+  );
+  const hidden = 5 - displayCount;
 
   return (
     <div className="poker-table">
@@ -35,7 +40,7 @@ export default function CommunityCards({ community, pot }: Props) {
         <div className="pot-amount">${pot}</div>
       </div>
       <div className="community-cards">
-        {community.map((card, i) => (
+        {community.slice(0, displayCount).map((card, i) => (
           <CardEl key={i} card={card} />
         ))}
         {Array.from({ length: hidden }).map((_, i) => (
