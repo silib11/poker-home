@@ -29,6 +29,7 @@ export default function GameScreen() {
     useGame();
   const [showRanking, setShowRanking] = useState(false);
   const [showHostMenu, setShowHostMenu] = useState(false);
+  const [showPlayerMenu, setShowPlayerMenu] = useState(false);
   const [sbInput, setSbInput] = useState(sb);
   const [bbInput, setBbInput] = useState(bb);
   const [leaving, setLeaving] = useState(false);
@@ -41,6 +42,7 @@ export default function GameScreen() {
   const myPlayer = myIndex >= 0 ? state.players[myIndex] : undefined;
 
   async function handleLeaveGame() {
+    setShowPlayerMenu(false);
     if (!confirm('途中退席しますか？現在のチップ数で精算されます。')) return;
     setLeaving(true);
     try {
@@ -191,29 +193,69 @@ export default function GameScreen() {
         </button>
       )}
 
-      {/* 途中退席ボタン（非ホスト用） */}
+      {/* プレイヤーメニューボタン（非ホスト用） */}
       {!isHost && (
         <button
-          disabled={leaving}
-          onClick={handleLeaveGame}
           style={{
             position: 'fixed',
             top: '10px',
             left: '10px',
-            padding: '8px 12px',
+            width: '44px',
+            height: '44px',
             background: 'rgba(0,0,0,0.7)',
             backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(239,68,68,0.4)',
-            borderRadius: '10px',
-            color: leaving ? 'rgba(255,255,255,0.4)' : '#f87171',
-            fontSize: '12px',
-            fontWeight: '600',
-            cursor: leaving ? 'not-allowed' : 'pointer',
+            border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: '12px',
+            color: '#fff',
+            fontSize: '18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             zIndex: 100,
           }}
+          onClick={() => setShowPlayerMenu(true)}
         >
-          {leaving ? '退席中...' : '途中退席'}
+          ⚙️
         </button>
+      )}
+
+      {/* プレイヤーメニューモーダル（非ホスト用） */}
+      {showPlayerMenu && (
+        <div
+          className="modal"
+          style={{ display: 'flex' }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowPlayerMenu(false);
+          }}
+        >
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3>メニュー</h3>
+              <button
+                className="close-btn"
+                onClick={() => setShowPlayerMenu(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <button
+                disabled={leaving}
+                onClick={handleLeaveGame}
+                className="modal-btn"
+                style={{
+                  background: 'rgba(239,68,68,0.15)',
+                  border: '1px solid rgba(239,68,68,0.4)',
+                  color: leaving ? 'rgba(255,255,255,0.4)' : '#f87171',
+                  width: '100%',
+                  cursor: leaving ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {leaving ? '退席中...' : '途中退席'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
 
