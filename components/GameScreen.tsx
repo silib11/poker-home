@@ -147,11 +147,14 @@ export default function GameScreen() {
       const phase = phases[i];
       const isLast = i === phases.length - 1;
 
+      // オールインランナウト中は各フェーズの溜めを長くする
+      const bannerDuration = isAllInRunout ? 1000 : 500;
+      const interPhasePause = isAllInRunout ? 2500 : 1500;
+
       if (phase === 'FLOP' || phase === 'TURN' || phase === 'RIVER') {
-        // バナーを表示（0.5秒）
         const d1 = delay;
         timers.push(setTimeout(() => setPhaseBanner(PHASE_LABEL[phase]), d1));
-        delay += 500;
+        delay += bannerDuration;
 
         // バナーを消してカードを公開
         const count = COMM_COUNT[phase];
@@ -172,16 +175,15 @@ export default function GameScreen() {
               setVisibleCommunityCount(count);
             }, d2)
           );
-          // 次のフェーズバナーまでカードを見せる時間（1.5秒）
-          delay += 1500;
+          // 次のフェーズバナーまでカードを見せる時間
+          delay += interPhasePause;
         }
       } else if (phase === 'SHOWDOWN') {
-        // SHOWDOWN バナーを表示（0.5秒）
         const d3 = delay;
         timers.push(
           setTimeout(() => setPhaseBanner(PHASE_LABEL['SHOWDOWN']), d3)
         );
-        delay += 500;
+        delay += bannerDuration;
 
         if (isAllInRunout) {
           // オールインランナウト: 手札はすでに公開済みなのでバナーを消してそのまま ShowdownView へ遷移
