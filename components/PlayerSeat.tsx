@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import type { Player, Card } from '@/types';
 
 interface Props {
@@ -24,6 +25,11 @@ export function formatStack(chips: number, bb: number, unit: 'chips' | 'bb'): st
   return chips.toLocaleString();
 }
 
+function avatarColor(name: string): string {
+  const hue = name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 360;
+  return `hsl(${hue}, 55%, 38%)`;
+}
+
 export default function PlayerSeat({
   player,
   isActive,
@@ -34,7 +40,9 @@ export default function PlayerSeat({
   bb = 20,
   stackUnit = 'chips',
 }: Props) {
+  const [showName, setShowName] = useState(false);
   const isShortStack = player.chips > 0 && player.chips < bb * 10;
+  const initial = player.name.charAt(0).toUpperCase();
 
   const classes = [
     'opponent',
@@ -48,9 +56,17 @@ export default function PlayerSeat({
 
   return (
     <div className={classes} style={{ left: x, top: y }}>
-      <div className="opponent-box">
+      <div className="opponent-box" onClick={() => setShowName((v) => !v)}>
         <span className="dealer-chip">D</span>
-        <span className="opponent-name">{player.name}</span>
+        {showName && (
+          <div className="opponent-name-popup">{player.name}</div>
+        )}
+        <div
+          className="opponent-avatar"
+          style={{ background: avatarColor(player.name) }}
+        >
+          {initial}
+        </div>
         <span
           className="opponent-stack"
           style={isShortStack ? { color: '#ef4444' } : undefined}
@@ -69,8 +85,8 @@ export default function PlayerSeat({
             <div
               key={i}
               style={{
-                width: '32px',
-                height: '46px',
+                width: '28px',
+                height: '40px',
                 background: '#fff',
                 borderRadius: '4px',
                 boxShadow: '0 3px 8px rgba(0,0,0,0.6)',
@@ -80,13 +96,13 @@ export default function PlayerSeat({
                 justifyContent: 'center',
                 gap: '1px',
                 color: suitColor(card.suit),
-                fontSize: '13px',
+                fontSize: '11px',
                 fontWeight: '700',
                 lineHeight: 1,
               }}
             >
               <span>{card.rank}</span>
-              <span style={{ fontSize: '11px' }}>{card.suit}</span>
+              <span style={{ fontSize: '10px' }}>{card.suit}</span>
             </div>
           ))
         ) : (
@@ -97,7 +113,7 @@ export default function PlayerSeat({
         )}
       </div>
       {player.bet && player.bet > 0 ? (
-        <div className="bet-badge">${player.bet}</div>
+        <div className="bet-badge">{formatStack(player.bet, bb, stackUnit)}</div>
       ) : null}
     </div>
   );

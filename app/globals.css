@@ -516,24 +516,52 @@ input[type="range"]::-moz-range-thumb {
     flex-direction: column;
     align-items: center;
     background: rgba(10, 15, 25, 0.95);
-    padding: 12px 20px;
+    padding: 8px 12px;
     border-radius: 14px;
     border: 2px solid rgba(255, 255, 255, 0.15);
-    min-width: 110px;
+    min-width: 72px;
     position: relative;
     backdrop-filter: blur(8px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    cursor: pointer;
+    user-select: none;
 }
 
-.opponent-name {
-    font-size: 16px;
-    color: rgba(255, 255, 255, 0.95);
+.opponent-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
     font-weight: 700;
-    margin-bottom: 6px;
+    color: #fff;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+
+.opponent-name-popup {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(10, 15, 25, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+    z-index: 300;
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
 }
 
 .opponent-stack {
-    font-size: 20px;
+    font-size: 14px;
     color: #4ade80;
     font-weight: bold;
 }
@@ -646,7 +674,7 @@ input[type="range"]::-moz-range-thumb {
 
 .bottom-row {
     display: grid;
-    grid-template-columns: 85px 1fr 90px;
+    grid-template-columns: 85px 1fr;
     gap: 8px;
     align-items: center;
 }
@@ -729,7 +757,7 @@ input[type="range"]::-moz-range-thumb {
 .my-card.blue { color: #2563eb; }
 .my-card.green { color: #16a34a; }
 
-/* Action Area */
+/* Action Area (spectator/reentry) */
 .action-area {
     display: flex;
     flex-direction: column;
@@ -737,11 +765,19 @@ input[type="range"]::-moz-range-thumb {
     gap: 4px;
 }
 
+/* Action Row - horizontal buttons */
+.action-row {
+    display: flex;
+    gap: 6px;
+    padding: 0 2px;
+}
+
 .action-btn {
-    padding: 8px 6px;
+    flex: 1;
+    padding: 11px 6px;
     border: none;
     border-radius: 8px;
-    font-size: 10px;
+    font-size: 12px;
     font-weight: bold;
     cursor: pointer;
     text-transform: uppercase;
@@ -749,6 +785,7 @@ input[type="range"]::-moz-range-thumb {
     transition: transform 0.1s;
     box-shadow: 0 2px 8px rgba(0,0,0,0.4);
     white-space: nowrap;
+    line-height: 1.2;
 }
 
 .action-btn:active {
@@ -1085,7 +1122,7 @@ input[type="range"]::-moz-range-thumb {
 
     /* ボトムグリッドの列幅調整 */
     .bottom-row {
-        grid-template-columns: 72px 1fr 80px;
+        grid-template-columns: 72px 1fr;
         gap: 6px;
     }
 
@@ -1102,11 +1139,11 @@ input[type="range"]::-moz-range-thumb {
         font-size: 12px;
     }
 
-    /* アクションボタンを少し大きく（タップしやすく） */
+    /* アクションボタン（モバイル） */
     .action-btn {
-        padding: 9px 6px;
+        padding: 10px 4px;
         font-size: 11px;
-        border-radius: 9px;
+        border-radius: 8px;
     }
 
     .btn-amount {
@@ -1147,20 +1184,23 @@ input[type="range"]::-moz-range-thumb {
 
     /* 相手プレイヤーのボックスを小さく */
     .opponent-box {
-        padding: 8px 12px;
-        min-width: 80px;
+        padding: 6px 10px;
+        min-width: 60px;
     }
 
-    .opponent-name {
+    .opponent-avatar {
+        width: 28px;
+        height: 28px;
         font-size: 13px;
+        margin-bottom: 3px;
     }
 
     .opponent-stack {
-        font-size: 16px;
+        font-size: 12px;
     }
 
     .mini-card {
-        width: 26px;
-        height: 38px;
+        width: 22px;
+        height: 32px;
     }
 }

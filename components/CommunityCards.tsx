@@ -24,9 +24,11 @@ interface Props {
   community: Card[];
   pot: number;
   visibleCount?: number;
+  bb?: number;
+  stackUnit?: 'chips' | 'bb';
 }
 
-export default function CommunityCards({ community, pot, visibleCount }: Props) {
+export default function CommunityCards({ community, pot, visibleCount, bb = 20, stackUnit = 'chips' }: Props) {
   const displayCount = Math.min(
     visibleCount !== undefined ? visibleCount : community.length,
     community.length
@@ -37,7 +39,9 @@ export default function CommunityCards({ community, pot, visibleCount }: Props) 
     <div className="poker-table">
       <div className="pot-display">
         <div className="pot-label">Pot</div>
-        <div className="pot-amount">${pot}</div>
+        <div className="pot-amount">
+          {stackUnit === 'bb' ? `${(pot / bb).toFixed(1)}BB` : `$${pot}`}
+        </div>
       </div>
       <div className="community-cards">
         {community.slice(0, displayCount).map((card, i) => (

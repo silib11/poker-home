@@ -316,43 +316,40 @@ export default function ActionPanel({
               ))}
             </div>
           </div>
-
-          {/* アクションボタン */}
-          <div className="action-area">
-            {!hideActions && isTurn && myPlayer && !myPlayer.folded ? (
-              <>
-                <div className="my-turn-banner">YOUR TURN</div>
-                <button className="action-btn btn-fold" onClick={handleFold}>
-                  Fold
-                </button>
-                {isCheck ? (
-                  <button className="action-btn btn-call" onClick={handleCheck}>
-                    Check
-                  </button>
-                ) : (
-                  <button className="action-btn btn-call" onClick={handleCall}>
-                    Call
-                    <span className="btn-amount">
-                      {stackUnit === 'bb'
-                        ? `${(callAmount / bb).toFixed(1)}BB`
-                        : `$${callAmount}`}
-                    </span>
-                  </button>
-                )}
-                {totalBetNeeded <= maxBetAmount && (
-                  <button className="action-btn btn-raise" onClick={handleBet}>
-                    {buttonText}
-                    <span className="btn-amount">
-                      {stackUnit === 'bb'
-                        ? `${(betAmount / bb).toFixed(1)}BB`
-                        : `$${betAmount}`}
-                    </span>
-                  </button>
-                )}
-              </>
-            ) : null}
-          </div>
         </div>
+
+        {/* アクションボタン（横並び） */}
+        {!hideActions && isTurn && myPlayer && !myPlayer.folded && (
+          <div className="action-row">
+            <button className="action-btn btn-fold" onClick={handleFold}>
+              Fold
+            </button>
+            {isCheck ? (
+              <button className="action-btn btn-call" onClick={handleCheck}>
+                Check
+              </button>
+            ) : (
+              <button className="action-btn btn-call" onClick={handleCall}>
+                Call
+                <span className="btn-amount">
+                  {stackUnit === 'bb'
+                    ? `${(callAmount / bb).toFixed(1)}BB`
+                    : `$${callAmount}`}
+                </span>
+              </button>
+            )}
+            {totalBetNeeded <= maxBetAmount && (
+              <button className="action-btn btn-raise" onClick={handleBet}>
+                {buttonText}
+                <span className="btn-amount">
+                  {stackUnit === 'bb'
+                    ? `${(betAmount / bb).toFixed(1)}BB`
+                    : `$${betAmount}`}
+                </span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ランキングボタン */}

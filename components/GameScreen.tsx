@@ -117,6 +117,8 @@ export default function GameScreen() {
                 community={state.community}
                 pot={state.pot}
                 visibleCount={state.community.length}
+                bb={bb}
+                stackUnit={stackUnit}
               />
               <div className="players-container">
                 {state.players.map((player, index) => {
@@ -354,6 +356,8 @@ export default function GameScreen() {
               community={state.community}
               pot={state.pot}
               visibleCount={visibleCommunityCount}
+              bb={bb}
+              stackUnit={stackUnit}
             />
             <div className="players-container">
               {state.players.map((player, index) => {
