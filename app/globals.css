@@ -1087,17 +1087,17 @@ input[type="range"]::-moz-range-thumb {
         flex: 0 0 auto;
     }
 
-    /* テーブル楕円をモバイルで上寄せ */
+    /* テーブル楕円をモバイルで中央下寄り（プレイヤーが上部配置のため） */
     .game-container::before {
-        top: 42%;
+        top: 58%;
         width: 96vw;
-        height: 48vh;
+        height: 44vh;
         max-width: none;
     }
 
-    /* ポーカーテーブル中心の位置調整 */
+    /* ポーカーテーブル中心の位置調整（プレイヤーが上部に集まるので中央寄りに） */
     .poker-table {
-        top: 38%;
+        top: 55%;
     }
 
     /* ボトムエリアをよりコンパクトに */

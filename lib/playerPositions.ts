@@ -11,28 +11,23 @@ export function getOpponentPositions(
   const opponentCount = count - 1;
   const positions: Position[] = [];
 
-  // モバイル（幅480px以下）: 左右列レイアウト
+  // モバイル（幅480px以下）: 上部横並びレイアウト
   if (width <= 480 && opponentCount > 0) {
-    if (opponentCount === 1) {
-      // 1人は左上（BlindLevelWidgetを避ける）
-      return [{ x: 72, y: 110 }];
+    const rowY1 = 105;
+    const rowY2 = 200;
+    const padX = 20;
+    const usableWidth = width - padX * 2;
+
+    const row1Count = opponentCount <= 4 ? opponentCount : Math.min(4, Math.ceil(opponentCount / 2));
+    const row2Count = opponentCount - row1Count;
+
+    for (let i = 0; i < row1Count; i++) {
+      const x = padX + usableWidth * ((i + 1) / (row1Count + 1));
+      positions.push({ x, y: rowY1 });
     }
-
-    const leftX = 72;
-    const rightX = width - 72;
-    const topY = 90;
-    const bottomY = height - 240;
-    const rows = Math.ceil(opponentCount / 2);
-
-    for (let i = 0; i < opponentCount; i++) {
-      const side = i % 2; // 0 = 左, 1 = 右
-      const row = Math.floor(i / 2);
-      const x = side === 0 ? leftX : rightX;
-      const y =
-        rows <= 1
-          ? (topY + bottomY) / 2
-          : topY + ((bottomY - topY) / (rows - 1)) * row;
-      positions.push({ x, y });
+    for (let i = 0; i < row2Count; i++) {
+      const x = padX + usableWidth * ((i + 1) / (row2Count + 1));
+      positions.push({ x, y: rowY2 });
     }
     return positions;
   }
